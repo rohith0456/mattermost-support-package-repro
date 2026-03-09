@@ -1,0 +1,281 @@
+# mm-repro base Docker Compose configuration
+# This is a reference file showing all available services.
+# Generated repro projects use a customized version of this.
+#
+# IMPORTANT: This environment is for LOCAL DEBUGGING ONLY.
+# All credentials in .env are local-only — never production credentials.
+
+version: '3.8'
+
+# ============================================================
+# NETWORKS
+# ============================================================
+networks:
+  mm-repro:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ============================================================
+# VOLUMES
+# ============================================================
+volumes:
+  postgres_data:
+    driver: local
+  mysql_data:
+    driver: local
+  opensearch_data:
+    driver: local
+  mattermost_data:
+    driver: local
+  mattermost_logs:
+    driver: local
+  mattermost_config:
+    driver: local
+  mattermost_plugins:
+    driver: local
+  mattermost_client_plugins:
+    driver: local
+  minio_data:
+    driver: local
+  ldap_data:
+    driver: local
+  ldap_config:
+    driver: local
+  keycloak_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+services:
+
+  # ============================================================
+  # POSTGRESQL (default database)
+  # ============================================================
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${MM_DB_USER:-mmuser}
+      POSTGRES_PASSWORD: ${MM_DB_PASSWORD:-mmuser_password}
+      POSTGRES_DB: ${MM_DB_NAME:-mattermost}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mm-repro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MM_DB_USER:-mmuser} -d ${MM_DB_NAME:-mattermost}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================
+  # MATTERMOST (core service)
+  # ============================================================
+  mattermost:
+    image: ${MM_IMAGE:-mattermost/mattermost-team-edition}:${MM_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database
+      MM_SQLSETTINGS_DRIVERNAME: ${MM_DB_DRIVER:-postgres}
+      MM_SQLSETTINGS_DATASOURCE: ${MM_DATASOURCE:-postgres://mmuser:mmuser_password@postgres:5432/mattermost?sslmode=disable}
+      # Service
+      MM_SERVICESETTINGS_SITEURL: ${MM_SITE_URL:-http://localhost:8065}
+      MM_SERVICESETTINGS_LISTENADDRESS: ":8065"
+      # Email (MailHog capture)
+      MM_EMAILSETTINGS_SMTPSERVER: mailhog
+      MM_EMAILSETTINGS_SMTPPORT: "1025"
+      MM_EMAILSETTINGS_ENABLESMTPAUTH: "false"
+      MM_EMAILSETTINGS_ENABLESECURECONNECTION: "false"
+      # Logging
+      MM_LOGSETTINGS_CONSOLELEVEL: INFO
+      MM_LOGSETTINGS_FILELEVEL: DEBUG
+      MM_LOGSETTINGS_ENABLEFILE: "true"
+      # File storage (local by default)
+      MM_FILESETTINGS_DRIVERNAME: local
+      MM_FILESETTINGS_DIRECTORY: /mattermost/data/
+    ports:
+      - "${MM_PORT:-8065}:8065"
+    volumes:
+      - mattermost_data:/mattermost/data
+      - mattermost_logs:/mattermost/logs
+      - mattermost_config:/mattermost/config
+      - mattermost_plugins:/mattermost/plugins
+      - mattermost_client_plugins:/mattermost/client/plugins
+    networks:
+      - mm-repro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8065/api/v4/system/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ============================================================
+  # MAILHOG — Local email capture (always enabled)
+  # ============================================================
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"   # SMTP
+      - "${MAILHOG_UI_PORT:-8025}:8025"     # Web UI
+    networks:
+      - mm-repro
+
+  # ============================================================
+  # OPENSEARCH — Optional: enable with --with-opensearch
+  # ============================================================
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    restart: unless-stopped
+    profiles:
+      - opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - DISABLE_SECURITY_PLUGIN=true
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - cluster.name=mm-repro-opensearch
+      - node.name=opensearch-node1
+    ports:
+      - "${OPENSEARCH_PORT:-9200}:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    networks:
+      - mm-repro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ============================================================
+  # MINIO — Optional: enable with --with-minio
+  # ============================================================
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    profiles:
+      - minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-repro_minio_user}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_password_local_repro_only}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - mm-repro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================
+  # OPENLDAP — Optional: enable with --with-ldap
+  # ============================================================
+  openldap:
+    image: osixia/openldap:1.5.0
+    restart: unless-stopped
+    profiles:
+      - ldap
+    environment:
+      LDAP_ORGANISATION: "Mattermost Repro Org"
+      LDAP_DOMAIN: ${LDAP_DOMAIN:-repro.local}
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-ldap_admin_local_repro_only}
+      LDAP_READONLY_USER: "true"
+      LDAP_READONLY_USER_USERNAME: ${LDAP_BIND_USER:-readonly}
+      LDAP_READONLY_USER_PASSWORD: ${LDAP_BIND_PASSWORD:-readonly_local_repro_only}
+    ports:
+      - "${LDAP_PORT:-389}:389"
+      - "${LDAPS_PORT:-636}:636"
+    volumes:
+      - ldap_data:/var/lib/ldap
+      - ldap_config:/etc/ldap/slapd.d
+    networks:
+      - mm-repro
+
+  # ============================================================
+  # KEYCLOAK — Optional: enable with --with-saml
+  # ============================================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    restart: unless-stopped
+    profiles:
+      - saml
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-keycloak_admin_local_repro_only}
+      KC_HTTP_PORT: 8080
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    networks:
+      - mm-repro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  # ============================================================
+  # PROMETHEUS — Optional: enable with --with-grafana
+  # ============================================================
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    profiles:
+      - grafana
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.retention.time=7d'
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - mm-repro
+
+  # ============================================================
+  # GRAFANA — Optional: enable with --with-grafana
+  # ============================================================
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    profiles:
+      - grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-grafana_admin_local_repro_only}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - mm-repro

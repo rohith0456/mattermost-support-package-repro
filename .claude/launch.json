@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mm-repro (build + doctor)",
+      "runtimeExecutable": "go",
+      "runtimeArgs": ["run", "./cmd/mm-repro/", "doctor"],
+      "port": 0
+    }
+  ]
+}

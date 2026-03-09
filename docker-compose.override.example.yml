@@ -1,0 +1,41 @@
+# docker-compose.override.yml — Local customization example
+#
+# Copy this to docker-compose.override.yml to customize your repro environment
+# without modifying the generated docker-compose.yml.
+#
+# docker-compose.override.yml is gitignored by default.
+# NEVER commit this file if it contains credentials.
+#
+# Docker Compose automatically merges docker-compose.yml + docker-compose.override.yml
+# No extra flags needed — just: docker compose up -d
+
+version: '3.8'
+
+services:
+  # Example: Override Mattermost environment variables
+  mattermost:
+    environment:
+      # Enable developer mode for easier debugging
+      MM_SERVICESETTINGS_ENABLEDEVELOPER: "true"
+
+      # Increase log verbosity
+      MM_LOGSETTINGS_CONSOLELEVEL: DEBUG
+
+      # Override site URL if needed
+      # MM_SERVICESETTINGS_SITEURL: http://myhost.local:8065
+
+      # Enable experimental features
+      # MM_EXPERIMENTALSETTINGS_ENABLEAPPBAR: "true"
+
+  # Example: Expose PostgreSQL on a non-default port to avoid conflicts
+  # postgres:
+  #   ports:
+  #     - "5433:5432"
+
+  # Example: Add extra environment for Mattermost config overrides
+  # (All MM_ env vars map to config settings)
+  # mattermost:
+  #   environment:
+  #     MM_PLUGINSETTINGS_ENABLEUPLOADS: "true"
+  #     MM_LOGSETTINGS_FILELEVEL: DEBUG
+  #     MM_SERVICESETTINGS_ENABLETESTING: "true"

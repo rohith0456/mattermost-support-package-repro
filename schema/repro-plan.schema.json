@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/rohith0456/mattermost-support-package-repro/schema/repro-plan.schema.json",
+  "title": "ReproPlan",
+  "description": "Machine-readable plan for a Mattermost local repro environment",
+  "type": "object",
+  "required": ["generated_at", "tool_version", "mattermost_image", "topology", "services"],
+  "properties": {
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the plan was generated"
+    },
+    "tool_version": {
+      "type": "string",
+      "description": "Version of mm-repro that generated this plan"
+    },
+    "source_package": {
+      "type": "string",
+      "description": "Path to the source support package"
+    },
+    "output_dir": {
+      "type": "string",
+      "description": "Output directory for the generated repro project"
+    },
+    "mattermost_image": {
+      "type": "string",
+      "description": "Docker image name for Mattermost"
+    },
+    "topology": {
+      "type": "string",
+      "enum": ["single-node", "multi-node"],
+      "description": "Deployment topology for the repro environment"
+    },
+    "node_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3,
+      "description": "Number of Mattermost nodes"
+    },
+    "services": {
+      "type": "object",
+      "description": "Service configuration for the repro environment",
+      "properties": {
+        "mattermost": {
+          "type": "object",
+          "properties": {
+            "image": {"type": "string"},
+            "tag": {"type": "string"},
+            "replicas": {"type": "integer", "minimum": 1},
+            "exposed_port": {"type": "integer"}
+          }
+        },
+        "database": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "type": {"type": "string", "enum": ["postgres", "mysql"]},
+            "image": {"type": "string"},
+            "tag": {"type": "string"},
+            "has_replica": {"type": "boolean"},
+            "exposed_port": {"type": "integer"}
+          }
+        }
+      }
+    },
+    "plugins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "version": {"type": "string"},
+          "action": {"type": "string", "enum": ["install", "skip", "stub", "manual"]},
+          "reason": {"type": "string"}
+        }
+      }
+    },
+    "approximations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "component": {"type": "string"},
+          "description": {"type": "string"},
+          "reason": {"type": "string"}
+        },
+        "required": ["component", "description", "reason"]
+      }
+    },
+    "unsupported": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "component": {"type": "string"},
+          "description": {"type": "string"},
+          "workaround": {"type": "string"}
+        },
+        "required": ["component", "description"]
+      }
+    },
+    "stubbed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "component": {"type": "string"},
+          "reason": {"type": "string"},
+          "stub_type": {"type": "string", "enum": ["disabled", "local-mock", "placeholder"]}
+        },
+        "required": ["component", "reason", "stub_type"]
+      }
+    }
+  }
+}
