@@ -270,7 +270,7 @@ See [docs/architecture.md](docs/architecture.md) for details.
 
 ## Supported Features
 
-- Mattermost versions: 7.x, 8.x, 9.x, 10.x
+- Mattermost versions: 7.x, 8.x, 9.x, 10.x, 11.x
 - Support package formats: standard, sanitized, cloud
 - Databases: PostgreSQL, MySQL
 - Search: OpenSearch/Elasticsearch (approximated with OpenSearch)
