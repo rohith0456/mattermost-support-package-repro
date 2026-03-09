@@ -160,7 +160,7 @@ Then delete the generated folder and the support package ZIP from your machine.
 
 ## Why It Exists
 
-Support engineers spend significant time manually setting up local environments to reproduce customer issues. This process is error-prone, time-consuming, and risky (credentials might accidentally leak). `mm-repro` automates the safe parts of this process, produces reproducible local environments, and enforces security best practices by default.
+Setting up a local environment to reproduce a Mattermost issue is slow, manual, and easy to get wrong. `mm-repro` automates that entirely — point it at a support package ZIP and get a running local environment in minutes, with no manual config and no risk of leaking real credentials.
 
 ---
 
