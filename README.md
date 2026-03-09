@@ -138,9 +138,42 @@ Three reports are generated alongside the environment:
 
 ### Step 7 — Reproduce the Issue
 
-Log in and reproduce the customer's issue in the local environment. All emails are captured by MailHog at `http://localhost:8025` — nothing goes to real email addresses.
+Log in and reproduce the issue in the local environment. All emails are captured by MailHog at `http://localhost:8025` — nothing is sent to real email addresses.
 
-Default test users (if LDAP was included): `alice.johnson` / `Repro1234!`
+#### Default Test Users
+
+All users below are pre-created in both LDAP and Keycloak (OIDC) when those services are included. Password for all: **`Repro1234!`**
+
+| Username | Full Name | Email | Role |
+|----------|-----------|-------|------|
+| `alice.johnson` | Alice Johnson | alice.johnson@repro.local | Developer |
+| `bob.smith` | Bob Smith | bob.smith@repro.local | Developer |
+| `carol.white` | Carol White | carol.white@repro.local | Team Lead |
+| `dave.brown` | Dave Brown | dave.brown@repro.local | Designer |
+| `eve.davis` | Eve Davis | eve.davis@repro.local | QA Engineer |
+| `frank.miller` | Frank Miller | frank.miller@repro.local | Support Engineer |
+| `grace.wilson` | Grace Wilson | grace.wilson@repro.local | Project Manager |
+| `henry.moore` | Henry Moore | henry.moore@repro.local | System Admin |
+
+#### Default LDAP Groups
+
+| Group | Members |
+|-------|---------|
+| `staff` | All 8 users |
+| `developers` | alice.johnson, bob.smith, carol.white |
+| `support` | eve.davis, frank.miller |
+| `management` | carol.white, grace.wilson |
+| `admins` | henry.moore |
+
+#### Service URLs
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Mattermost | http://localhost (nginx) or http://localhost:8065 (direct) | Sign in with LDAP users above |
+| MailHog (email capture) | http://localhost:8025 | No login required |
+| MinIO (file storage) | http://localhost:9001 | `minioadmin` / `minio_local_repro_only` |
+| Keycloak (OIDC admin) | http://localhost:8080 | `admin` / `keycloak_admin_local_repro_only` |
+| phpLDAPadmin | http://localhost:8089 | `cn=admin,dc=repro,dc=local` / `ldap_admin_local_repro_only` |
 
 ---
 
