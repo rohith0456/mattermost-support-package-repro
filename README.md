@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/rohith0456/mattermost-support-package-repro/actions/workflows/ci.yml/badge.svg)](https://github.com/rohith0456/mattermost-support-package-repro/actions/workflows/ci.yml)
 [![Go Version](https://img.shields.io/badge/Go-1.22+-blue)](https://go.dev)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Security](https://img.shields.io/badge/Security-Safe%20by%20Default-green)](docs/security.md)
 
 **FOR LOCAL DEBUGGING ONLY. Never uses real production credentials.**
@@ -568,4 +568,4 @@ Support packages may contain sensitive customer information. Follow these practi
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE)
