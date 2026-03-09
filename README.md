@@ -37,6 +37,127 @@ make run
 
 ---
 
+## Get Started in 5 Minutes
+
+> No YAML editing. No manual config. Just point at the ZIP and go.
+
+### Step 1 — Install Docker Desktop
+
+Download and start **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** for your OS (Mac, Windows, or Linux). Make sure it is running before continuing.
+
+---
+
+### Step 2 — Install mm-repro
+
+**Mac or Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/rohith0456/mattermost-support-package-repro/main/scripts/install.sh | bash
+```
+
+**Windows** — open PowerShell and run:
+```powershell
+winget install golang.go          # installs Go if not already installed
+go install github.com/rohith0456/mattermost-support-package-repro/cmd/mm-repro@latest
+```
+Then add `%USERPROFILE%\go\bin` to your `PATH` if it isn't already.
+
+**Verify the install:**
+```bash
+mm-repro doctor
+```
+You should see all green checks. If Docker is flagged, make sure Docker Desktop is running.
+
+---
+
+### Step 3 — Get the Support Package ZIP
+
+Download the customer's support package ZIP from your ticket system (Zendesk, Jira, etc.) to your computer. For example:
+
+```
+~/Downloads/customer-support-package.zip
+```
+
+> The ZIP is read-only — mm-repro never modifies the original file.
+
+---
+
+### Step 4 — Generate the Environment
+
+Run this one command, pointing at the ZIP you just downloaded:
+
+```bash
+mm-repro init --support-package ~/Downloads/customer-support-package.zip
+```
+
+mm-repro will:
+- Detect the Mattermost version, database type, auth setup, and plugins
+- Generate a ready-to-run Docker Compose project in `./generated-repro/<customer-name>/`
+- Replace all real credentials with safe local-only ones
+- Print a summary of what was detected
+
+**Optional flags** — add any that match the customer's setup:
+```bash
+mm-repro init --support-package ~/Downloads/customer.zip \
+  --with-ldap        # include OpenLDAP (LDAP auth)
+  --with-saml        # include Keycloak (SAML / OIDC auth)
+  --with-opensearch  # include OpenSearch (search issues)
+  --with-minio       # include MinIO (S3 file storage)
+  --with-grafana     # include Prometheus + Grafana (metrics)
+```
+
+---
+
+### Step 5 — Start the Environment
+
+```bash
+cd generated-repro/<customer-name>/
+make run
+```
+
+Wait about 30–60 seconds for all containers to come up (Keycloak takes the longest). Then open:
+
+```
+http://localhost:8065
+```
+
+You'll see a fresh Mattermost instance matching the customer's version and configuration.
+
+---
+
+### Step 6 — Read the Reports
+
+Three reports are generated alongside the environment:
+
+| File | What it tells you |
+|------|------------------|
+| `REPRO_SUMMARY.md` | What was recreated, approximated, and skipped |
+| `REDACTION_REPORT.md` | What credentials were detected and replaced |
+| `PLUGIN_REPORT.md` | Which plugins were detected and their install status |
+
+---
+
+### Step 7 — Reproduce the Issue
+
+Log in and reproduce the customer's issue in the local environment. All emails are captured by MailHog at `http://localhost:8025` — nothing goes to real email addresses.
+
+Default test users (if LDAP was included): `alice.johnson` / `Repro1234!`
+
+---
+
+### Step 8 — Clean Up When Done
+
+```bash
+# Stop containers (keeps data):
+make stop
+
+# Or fully reset — removes all containers and volumes:
+make reset
+```
+
+Then delete the generated folder and the support package ZIP from your machine.
+
+---
+
 ## Why It Exists
 
 Support engineers spend significant time manually setting up local environments to reproduce customer issues. This process is error-prone, time-consuming, and risky (credentials might accidentally leak). `mm-repro` automates the safe parts of this process, produces reproducible local environments, and enforces security best practices by default.
