@@ -4,7 +4,7 @@
 
 ## mm-repro v0.1.0 — Initial Release
 
-We're excited to release the first version of `mm-repro`, a tool for Mattermost support engineers to generate local reproducible environments from customer support packages.
+We're excited to release the first version of `mm-repro`, a tool to generate local reproducible Mattermost environments from support packages.
 
 ### What's New
 
@@ -82,4 +82,4 @@ open http://localhost:8065
 
 ---
 
-Thank you to the Mattermost support engineering team for feedback and testing.
+Thank you to everyone who provided feedback and testing.

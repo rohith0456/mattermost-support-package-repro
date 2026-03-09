@@ -493,18 +493,18 @@ A: No. The `.gitignore` in `generated/` prevents this. The `.env` file contains 
 
 ---
 
-## How Support Engineers Should Use This
+## How to Use This Tool
 
-1. **Get the support package** from the ticket (Zendesk/Jira attachment)
-2. **Run validate** first to understand what's in the package
-3. **Run plan** to preview what will be created
-4. **Run init** with any needed optional services (--with-ldap, etc.)
+1. **Download the support package** ZIP from wherever you received it
+2. **Run validate** to see what signals are inside the package
+3. **Run plan** to preview what environment will be created
+4. **Run init** with any optional services needed (--with-ldap, --with-saml, etc.)
 5. **Read the reports** — especially REPRO_SUMMARY.md and PLUGIN_REPORT.md
 6. **Start the environment** with `make run`
 7. **Reproduce the issue** in the local environment
-8. **Use `make reset`** when done to clean up volumes
-9. **Delete the generated directory** when finished debugging
-10. **Never share** the generated `.env` or support package contents
+8. **Use `make reset`** when done to remove all containers and volumes
+9. **Delete the generated directory** when finished
+10. **Never share** the generated `.env` file or the original support package
 
 ---
 
