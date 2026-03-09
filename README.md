@@ -13,7 +13,7 @@
 
 ## What This Tool Does
 
-`mm-repro` takes a Mattermost support package ZIP file and generates a complete local Docker Compose environment that approximates the customer's setup. Support engineers can use it to reproduce issues locally without needing access to the customer environment.
+`mm-repro` generates a local reproduction setup from a Mattermost support package.
 
 **One command:**
 ```bash
