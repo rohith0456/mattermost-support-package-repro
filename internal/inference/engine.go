@@ -31,6 +31,7 @@ func (e *Engine) Infer(sp *models.SupportPackage, outputDir string) *models.Repr
 
 	e.inferVersion(plan, sp)
 	e.inferTopology(plan, sp)
+	e.inferOutputFormat(plan, sp)
 	e.inferDatabase(plan, sp)
 	e.inferSearch(plan, sp)
 	e.inferAuth(plan, sp)
@@ -111,6 +112,27 @@ func (e *Engine) inferTopology(plan *models.ReproPlan, sp *models.SupportPackage
 		plan.NodeCount = 1
 		plan.Services.Mattermost.Replicas = 1
 	}
+}
+
+func (e *Engine) inferOutputFormat(plan *models.ReproPlan, sp *models.SupportPackage) {
+	// --force-docker-compose always wins
+	if e.flags.ForceDockerCompose {
+		plan.OutputFormat = "docker-compose"
+		return
+	}
+	// Explicit flag or auto-detected k8s platform
+	if e.flags.WithKubernetes || sp.Topology.DeploymentPlatform == "kubernetes" {
+		plan.OutputFormat = "kubernetes"
+		if sp.Topology.DeploymentPlatform == "kubernetes" && !e.flags.WithKubernetes {
+			plan.Approximations = append(plan.Approximations, models.Approximation{
+				Component:   "output-format",
+				Description: "Kubernetes deployment detected — generating Kubernetes manifests for local kind cluster",
+				Reason:      "Node IDs or SiteURL match Kubernetes patterns; use --force-docker-compose to override",
+			})
+		}
+		return
+	}
+	plan.OutputFormat = "docker-compose"
 }
 
 func (e *Engine) inferDatabase(plan *models.ReproPlan, sp *models.SupportPackage) {

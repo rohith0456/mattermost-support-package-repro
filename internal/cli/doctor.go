@@ -74,12 +74,35 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Optional: kubectl + kind (for --with-kubernetes)
+	fmt.Println("\nChecking optional Kubernetes tools (required only for --with-kubernetes):")
+	if _, err := exec.LookPath("kubectl"); err == nil {
+		if ver, e := runCommand("kubectl", "version", "--client", "--short"); e == nil {
+			printSuccess(fmt.Sprintf("kubectl %s", strings.TrimSpace(ver)))
+		} else {
+			printSuccess("kubectl is available")
+		}
+	} else {
+		printInfo("[optional] kubectl not found — needed for Kubernetes repro environments")
+		printInfo("           Install: https://kubernetes.io/docs/tasks/tools/")
+	}
+	if _, err := exec.LookPath("kind"); err == nil {
+		if ver, e := runCommand("kind", "version"); e == nil {
+			printSuccess(fmt.Sprintf("%s", strings.TrimSpace(ver)))
+		} else {
+			printSuccess("kind is available")
+		}
+	} else {
+		printInfo("[optional] kind not found — needed for Kubernetes repro environments")
+		printInfo("           Install: https://kind.sigs.k8s.io/docs/user/quick-start/")
+	}
+
 	// Platform info
 	fmt.Printf("\nPlatform: %s/%s\n", runtime.GOOS, runtime.GOARCH)
 
 	fmt.Println()
 	if allOK {
-		printSuccess("All prerequisites satisfied. You're ready to run mm-repro!")
+		printSuccess("All required prerequisites satisfied. You're ready to run mm-repro!")
 	} else {
 		printWarning("Some prerequisites are missing. Please resolve the issues above.")
 	}

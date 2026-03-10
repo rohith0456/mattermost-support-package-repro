@@ -17,30 +17,33 @@ import (
 )
 
 var (
-	initSupportPackage string
-	initOutputDir      string
-	initForceDB        string
-	initForceSingle    bool
-	initForceMulti     bool
-	initWithOpenSearch bool
-	initWithLDAP       bool
-	initWithSAML       bool
-	initWithMinIO      bool
-	initWithRTCD       bool
-	initWithGrafana    bool
-	initRedactStrict   bool
-	initIssueName      string
+	initSupportPackage    string
+	initOutputDir         string
+	initForceDB           string
+	initForceSingle       bool
+	initForceMulti        bool
+	initWithOpenSearch    bool
+	initWithLDAP          bool
+	initWithSAML          bool
+	initWithMinIO         bool
+	initWithRTCD          bool
+	initWithGrafana       bool
+	initRedactStrict      bool
+	initIssueName         string
+	initWithKubernetes    bool
+	initForceDockerCompose bool
 )
 
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Parse a support package and generate a local repro project",
-	Long: `Parse a Mattermost support package and generate a ready-to-run Docker
-Compose repro environment in a new directory.
+	Long: `Parse a Mattermost support package and generate a ready-to-run repro
+environment (Docker Compose or Kubernetes) in a new directory.
 
 Example:
   mm-repro init --support-package ./customer-support-package.zip
   mm-repro init --support-package ./sp.zip --with-ldap --with-opensearch
+  mm-repro init --support-package ./sp.zip --with-kubernetes
   mm-repro init --support-package ./sp.zip --output ./my-repros/issue-1234`,
 	RunE: runInit,
 }
@@ -59,6 +62,8 @@ func init() {
 	initCmd.Flags().BoolVar(&initWithRTCD, "with-rtcd", false, "Include local RTCD (Calls) service")
 	initCmd.Flags().BoolVar(&initWithGrafana, "with-grafana", false, "Include Prometheus + Grafana observability stack")
 	initCmd.Flags().BoolVar(&initRedactStrict, "redact-strict", false, "Apply strict redaction (also redacts server addresses and emails)")
+	initCmd.Flags().BoolVar(&initWithKubernetes, "with-kubernetes", false, "Generate Kubernetes manifests (kind) instead of Docker Compose")
+	initCmd.Flags().BoolVar(&initForceDockerCompose, "force-docker-compose", false, "Force Docker Compose output even when a Kubernetes deployment is detected")
 
 	_ = initCmd.MarkFlagRequired("support-package")
 }
@@ -127,16 +132,18 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Step 5: Infer + Generate
 	printInfo("Step 5/5: Building repro plan and generating project...")
 	flags := models.ReproFlags{
-		ForceDB:        initForceDB,
-		ForceSingleNode: initForceSingle,
-		ForceMultiNode:  initForceMulti,
-		WithOpenSearch: initWithOpenSearch,
-		WithLDAP:       initWithLDAP,
-		WithSAML:       initWithSAML,
-		WithMinIO:      initWithMinIO,
-		WithRTCD:       initWithRTCD,
-		WithGrafana:    initWithGrafana,
-		RedactStrict:   initRedactStrict,
+		ForceDB:            initForceDB,
+		ForceSingleNode:    initForceSingle,
+		ForceMultiNode:     initForceMulti,
+		WithOpenSearch:     initWithOpenSearch,
+		WithLDAP:           initWithLDAP,
+		WithSAML:           initWithSAML,
+		WithMinIO:          initWithMinIO,
+		WithRTCD:           initWithRTCD,
+		WithGrafana:        initWithGrafana,
+		RedactStrict:       initRedactStrict,
+		WithKubernetes:     initWithKubernetes,
+		ForceDockerCompose: initForceDockerCompose,
 	}
 	engine := inference.NewEngine(flags)
 	plan := engine.Infer(sp, outputDir)
@@ -156,6 +163,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Image:    %s:%s\n", plan.MattermostImage, plan.Services.Mattermost.Tag)
 	fmt.Printf("  Topology: %s (%d node(s))\n", plan.Topology, plan.NodeCount)
 	fmt.Printf("  Database: %s\n", plan.Services.Database.Type)
+	fmt.Printf("  Output:   %s\n", plan.OutputFormat)
 	if plan.Services.Search.Enabled {
 		fmt.Printf("  Search:   %s\n", plan.Services.Search.Backend)
 	}
@@ -171,7 +179,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Next steps:\n")
 	fmt.Printf("  cd %s\n", outputDir)
 	fmt.Printf("  make run\n")
-	fmt.Printf("  open http://localhost:8065\n\n")
+	if plan.OutputFormat == "kubernetes" {
+		fmt.Printf("  open http://localhost:30065\n\n")
+		fmt.Printf("Requirements: kind + kubectl must be installed.\n")
+		fmt.Printf("  kind:    https://kind.sigs.k8s.io/docs/user/quick-start/\n")
+		fmt.Printf("  kubectl: https://kubernetes.io/docs/tasks/tools/\n\n")
+	} else {
+		fmt.Printf("  open http://localhost:8065\n\n")
+	}
 	fmt.Printf("Review the reports:\n")
 	fmt.Printf("  cat %s/REPRO_SUMMARY.md\n", outputDir)
 	fmt.Printf("  cat %s/REDACTION_REPORT.md\n", outputDir)

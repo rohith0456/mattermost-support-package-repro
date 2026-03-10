@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"regexp"
+
 	"github.com/rohith0456/mattermost-support-package-repro/internal/ingestion"
 	"github.com/rohith0456/mattermost-support-package-repro/pkg/models"
 )
@@ -132,6 +134,22 @@ func ParseTopology(np *ingestion.NormalizedPackage) models.TopologyInfo {
 	}
 	if forward := getNestedString(np.Config, "ServiceSettings", "AllowedUntrustedInternalConnections"); forward != "" {
 		info.HasReverseProxy = true
+	}
+
+	// Kubernetes detection — check node IDs for k8s pod naming patterns
+	// Deployment pods: <name>-<replicaset-hash>-<pod-hash>  e.g. mattermost-7d8f4b5c6-2xzpk
+	// StatefulSet pods: <name>-<ordinal>                     e.g. mattermost-0, mattermost-1
+	k8sDeploymentPod := regexp.MustCompile(`^[a-z0-9-]+-[a-z0-9]{5,10}-[a-z0-9]{5}$`)
+	k8sStatefulPod := regexp.MustCompile(`^[a-z0-9][a-z0-9-]*-\d+$`)
+	for _, id := range info.NodeIDs {
+		if k8sDeploymentPod.MatchString(id) || k8sStatefulPod.MatchString(id) {
+			info.DeploymentPlatform = "kubernetes"
+			break
+		}
+	}
+	// Also check SiteURL for k8s ingress hostnames
+	if info.DeploymentPlatform == "" && containsAny(siteURL, []string{".cluster.local", ".svc.", "kubernetes"}) {
+		info.DeploymentPlatform = "kubernetes"
 	}
 
 	return info

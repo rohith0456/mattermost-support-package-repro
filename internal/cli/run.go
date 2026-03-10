@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -10,23 +13,61 @@ import (
 
 var runProjectDir string
 
+// outputFormatFor reads repro-plan.json from the project directory and returns the output_format.
+// Returns "docker-compose" if the file is missing or the field is not set.
+func outputFormatFor(projectDir string) string {
+	planPath := filepath.Join(projectDir, "repro-plan.json")
+	data, err := os.ReadFile(planPath)
+	if err != nil {
+		return "docker-compose"
+	}
+	var plan struct {
+		OutputFormat string `json:"output_format"`
+	}
+	if err := json.Unmarshal(data, &plan); err != nil || plan.OutputFormat == "" {
+		return "docker-compose"
+	}
+	return plan.OutputFormat
+}
+
+// newLauncherFor returns the appropriate launcher based on the project's output format.
+func newLauncherFor(projectDir string) (interface {
+	Up() error
+	Down() error
+	Reset() error
+	Status() error
+}, error) {
+	format := outputFormatFor(projectDir)
+	if format == "kubernetes" {
+		return runtime.NewK8sLauncher(projectDir)
+	}
+	return runtime.NewLauncher(projectDir)
+}
+
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Start a generated repro environment",
-	Long: `Start the Docker Compose environment for a generated repro project.
+	Long: `Start the repro environment for a generated repro project.
+Automatically uses Docker Compose or Kubernetes (kind) based on
+the output format recorded in repro-plan.json.
 
 Example:
   mm-repro run --project ./generated-repro/my-repro`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		launcher, err := runtime.NewLauncher(runProjectDir)
+		launcher, err := newLauncherFor(runProjectDir)
 		if err != nil {
 			return err
 		}
-		printInfo(fmt.Sprintf("Starting environment in: %s", runProjectDir))
+		format := outputFormatFor(runProjectDir)
+		printInfo(fmt.Sprintf("Starting %s environment in: %s", format, runProjectDir))
 		if err := launcher.Up(); err != nil {
 			return fmt.Errorf("starting environment: %w", err)
 		}
-		printSuccess("Environment started. Open http://localhost:8065")
+		if format == "kubernetes" {
+			printSuccess("Environment started. Open http://localhost:30065")
+		} else {
+			printSuccess("Environment started. Open http://localhost:8065")
+		}
 		return nil
 	},
 }
@@ -35,7 +76,7 @@ var stopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop a generated repro environment",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		launcher, err := runtime.NewLauncher(stopProjectDir)
+		launcher, err := newLauncherFor(stopProjectDir)
 		if err != nil {
 			return err
 		}
@@ -50,14 +91,16 @@ var stopCmd = &cobra.Command{
 
 var resetCmd = &cobra.Command{
 	Use:   "reset",
-	Short: "Reset a generated repro environment (removes all volumes)",
-	Long: `Stop the environment and remove all Docker volumes.
+	Short: "Reset a generated repro environment (removes all data)",
+	Long: `Stop the environment and remove all data.
+For Docker Compose: removes all Docker volumes.
+For Kubernetes: deletes the entire kind cluster.
 WARNING: All data will be lost.
 
 Example:
   mm-repro reset --project ./generated-repro/my-repro`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		launcher, err := runtime.NewLauncher(resetProjectDir)
+		launcher, err := newLauncherFor(resetProjectDir)
 		if err != nil {
 			return err
 		}
@@ -73,9 +116,9 @@ Example:
 
 var reportCmd = &cobra.Command{
 	Use:   "report",
-	Short: "Show the repro report for a generated project",
+	Short: "Show pod/service status for a generated project",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		launcher, err := runtime.NewLauncher(reportProjectDir)
+		launcher, err := newLauncherFor(reportProjectDir)
 		if err != nil {
 			return err
 		}

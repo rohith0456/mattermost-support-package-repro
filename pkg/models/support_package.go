@@ -64,13 +64,14 @@ type VersionInfo struct {
 
 // TopologyInfo describes the deployment topology.
 type TopologyInfo struct {
-	NodeCount       int      `json:"node_count"`
-	IsCluster       bool     `json:"is_cluster"`
-	NodeIDs         []string `json:"node_ids,omitempty"`
-	HasReverseProxy bool     `json:"has_reverse_proxy"`
-	ProxyType       string   `json:"proxy_type,omitempty"` // "nginx", "apache", "haproxy", "unknown"
-	SiteURL         string   `json:"site_url,omitempty"`   // sanitized, local use only
-	HasTLS          bool     `json:"has_tls"`
+	NodeCount          int      `json:"node_count"`
+	IsCluster          bool     `json:"is_cluster"`
+	NodeIDs            []string `json:"node_ids,omitempty"`
+	HasReverseProxy    bool     `json:"has_reverse_proxy"`
+	ProxyType          string   `json:"proxy_type,omitempty"`          // "nginx", "apache", "haproxy", "unknown"
+	SiteURL            string   `json:"site_url,omitempty"`            // sanitized, local use only
+	HasTLS             bool     `json:"has_tls"`
+	DeploymentPlatform string   `json:"deployment_platform,omitempty"` // "docker", "kubernetes", "unknown"
 }
 
 // DatabaseInfo describes the database backend.

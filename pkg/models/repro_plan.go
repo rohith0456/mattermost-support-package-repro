@@ -13,8 +13,9 @@ type ReproPlan struct {
 
 	// Core decisions
 	MattermostImage string `json:"mattermost_image"`
-	Topology        string `json:"topology"` // "single-node", "multi-node"
+	Topology        string `json:"topology"`      // "single-node", "multi-node"
 	NodeCount       int    `json:"node_count"`
+	OutputFormat    string `json:"output_format"` // "docker-compose", "kubernetes"
 
 	// Service plan
 	Services ServicePlan `json:"services"`
@@ -154,14 +155,16 @@ type StubbedItem struct {
 
 // ReproFlags holds the CLI flags that influenced the plan.
 type ReproFlags struct {
-	ForceDB         string `json:"force_db,omitempty"`
-	ForceSingleNode bool   `json:"force_single_node"`
-	ForceMultiNode  bool   `json:"force_multi_node"`
-	WithOpenSearch  bool   `json:"with_opensearch"`
-	WithLDAP        bool   `json:"with_ldap"`
-	WithSAML        bool   `json:"with_saml"`
-	WithMinIO       bool   `json:"with_minio"`
-	WithRTCD        bool   `json:"with_rtcd"`
-	WithGrafana     bool   `json:"with_grafana"`
-	RedactStrict    bool   `json:"redact_strict"`
+	ForceDB           string `json:"force_db,omitempty"`
+	ForceSingleNode   bool   `json:"force_single_node"`
+	ForceMultiNode    bool   `json:"force_multi_node"`
+	WithOpenSearch    bool   `json:"with_opensearch"`
+	WithLDAP          bool   `json:"with_ldap"`
+	WithSAML          bool   `json:"with_saml"`
+	WithMinIO         bool   `json:"with_minio"`
+	WithRTCD          bool   `json:"with_rtcd"`
+	WithGrafana       bool   `json:"with_grafana"`
+	RedactStrict      bool   `json:"redact_strict"`
+	WithKubernetes    bool   `json:"with_kubernetes"`
+	ForceDockerCompose bool  `json:"force_docker_compose"`
 }
