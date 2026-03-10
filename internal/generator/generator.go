@@ -234,6 +234,12 @@ logs:
 ## status: Show pod status
 status:
 	kubectl -n $(NS) get pods
+
+## seed: Seed test posts, images and reactions (run after 'make run' once MM is up)
+## Usage: make seed PASS=YourAdminPassword
+seed:
+	@which mm-repro > /dev/null 2>&1 || (echo "mm-repro not found. Install: go install github.com/rohith0456/mattermost-support-package-repro/cmd/mm-repro@latest" && exit 1)
+	mm-repro seed --url http://localhost:30065 --project . $(if $(PASS),--password $(PASS),)
 ` + ngrokTargets
 	return g.writeFile("Makefile", content)
 }
@@ -354,6 +360,13 @@ ps:
 ## health: Check service health
 health:
 	$(COMPOSE) -f $(COMPOSE_FILE) --env-file $(ENV_FILE) ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}"
+
+## seed: Seed test posts, images and reactions (run after 'make run' once MM is up)
+## Usage: make seed PASS=YourAdminPassword
+## Or:   mm-repro seed --project . --with-files --password YourAdminPassword
+seed:
+	@which mm-repro > /dev/null 2>&1 || (echo "mm-repro not found. Install: go install github.com/rohith0456/mattermost-support-package-repro/cmd/mm-repro@latest" && exit 1)
+	mm-repro seed --project . $(if $(PASS),--password $(PASS),)
 ` + ngrokTargets
 	return g.writeFile("Makefile", content)
 }

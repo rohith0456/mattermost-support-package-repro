@@ -50,6 +50,7 @@ func init() {
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(resetCmd)
 	rootCmd.AddCommand(reportCmd)
+	rootCmd.AddCommand(seedCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 

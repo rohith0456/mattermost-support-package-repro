@@ -65,7 +65,23 @@ make run
 
 Open `http://localhost:8065` — Mattermost is running, matching the exact version and config from the support package. All emails go to MailHog at `http://localhost:8025`, nothing real gets sent.
 
-### 4 — Reproduce, then Clean Up
+### 4 — Seed Test Content
+
+Once Mattermost is running, populate it with posts, threads, reactions, images and file attachments in one command:
+
+```bash
+make seed PASS=YourAdminPassword
+```
+
+Or with the CLI directly for more control:
+
+```bash
+mm-repro seed --project . --with-files --posts 30 --password YourAdminPassword
+```
+
+This fills `~town-square` and `~off-topic` with varied test content — markdown formatting, code blocks, link unfurling, threaded conversations, emoji reactions, and (with `--with-files`) PNG screenshots and log file attachments.
+
+### 5 — Reproduce, then Clean Up
 
 ```bash
 make stop    # stop (keeps data)
@@ -244,6 +260,38 @@ See [docs/kubernetes.md](docs/kubernetes.md) for the full Kubernetes guide.
 
 ---
 
+## 🌱 Seed Test Data
+
+After the environment is running, `mm-repro seed` fills it with realistic test content so you can start testing immediately — no manual post creation needed.
+
+```bash
+# Quick seed (20 posts, no files)
+mm-repro seed --project ./generated-repro/<timestamp>/ --password YourAdminPassword
+
+# Full seed with file attachments
+mm-repro seed --project . --with-files --posts 30 --password YourAdminPassword
+
+# Or use the Makefile shortcut from the generated project directory
+make seed PASS=YourAdminPassword
+```
+
+**What gets created:**
+
+| Content | Details |
+|---------|---------|
+| 📝 **Text posts** | Markdown, tables, code blocks, blockquotes, lists |
+| 🧵 **Threads** | Nested replies to test threaded conversations |
+| 😄 **Reactions** | Random emoji reactions on posts |
+| 🔗 **Links** | Posts with URLs that trigger link previews |
+| 📸 **Images** (`--with-files`) | Coloured PNG screenshots attached inline |
+| 📄 **Log files** (`--with-files`) | `.log` text file attachments with preview |
+
+Posts land in both `~town-square` and `~off-topic`. Run multiple times to add more content — each run is additive, nothing is overwritten.
+
+> **First run?** If Mattermost's setup wizard hasn't been completed yet, open `http://localhost:8065` first and create your admin account. Then run `mm-repro seed` — it will connect and log in with the credentials you provide.
+
+---
+
 ## Security: Safe by Default
 
 mm-repro is built so you can't accidentally leak sensitive data:
@@ -269,6 +317,7 @@ See [docs/security.md](docs/security.md) for the complete threat model.
 | `mm-repro run --project <dir>` | Start a generated environment |
 | `mm-repro stop --project <dir>` | Stop it |
 | `mm-repro reset --project <dir>` | Wipe all data and start fresh |
+| `mm-repro seed --project <dir>` | Seed posts, threads, reactions and files |
 
 Full `init` flags:
 ```
