@@ -238,23 +238,6 @@ Mix and match whatever the environment needs.
 
 ---
 
-## Default Test Users
-
-All environments come with 8 pre-built users. Password for all: **`Repro1234!`**
-
-| Username | Role |
-|----------|------|
-| `alice.johnson` | Developer |
-| `bob.smith` | Developer |
-| `carol.white` | Team Lead |
-| `dave.brown` | Designer |
-| `eve.davis` | QA Engineer |
-| `frank.miller` | Support Engineer |
-| `grace.wilson` | Project Manager |
-| `henry.moore` | System Admin |
-
-When `--with-ldap` is included, all users are pre-loaded in OpenLDAP too.
-
 ---
 
 ## Services at a Glance
