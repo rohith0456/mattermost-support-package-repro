@@ -57,13 +57,22 @@ mm-repro doctor
 
 ### 3 — Run It
 
+**With a support package** (auto-detects version, DB, topology, services):
 ```bash
 mm-repro init --support-package ~/Downloads/support-package.zip
 cd generated-repro/<timestamp>/
 make run
 ```
 
-Open `http://localhost:8065` — Mattermost is running, matching the exact version and config from the support package. All emails go to MailHog at `http://localhost:8025`, nothing real gets sent.
+**Without a support package** — interactive wizard picks your setup:
+```bash
+mm-repro init
+# → answers a few questions, then generates and runs
+cd generated-repro/<timestamp>/
+make run
+```
+
+Open `http://localhost:8065` — Mattermost is running. All emails go to MailHog at `http://localhost:8025`, nothing real gets sent.
 
 ### 4 — Seed Test Content
 
@@ -127,6 +136,60 @@ generated-repro/<timestamp>/
 ```
 
 No manual YAML editing. No hunting for the right image tag. No credential leaks.
+
+---
+
+## 🧙 No Support Package? Use the Wizard
+
+Don't have a support package yet, or just want to spin up a clean local Mattermost for testing? Run `mm-repro init` with no arguments:
+
+```bash
+mm-repro init
+```
+
+An interactive wizard walks you through every option:
+
+```
+── Mattermost Version
+  Version (e.g. 10.5.0 — or press Enter for latest) [latest]:
+
+── Database
+  Database type:
+  ▶ [1] PostgreSQL 15 (recommended)
+    [2] MySQL 8.0
+
+── Topology
+  Deployment topology:
+  ▶ [1] Single-node  (1 Mattermost container — fastest, simplest)
+    [2] Multi-node HA (2 nodes behind nginx load balancer)
+    [3] Multi-node HA (3 nodes behind nginx load balancer)
+
+── Output Format
+  How to run it:
+  ▶ [1] Docker Compose  (docker compose up — needs Docker Desktop)
+    [2] Kubernetes (kind)  (kubectl apply — needs kind + kubectl)
+
+── Optional Services
+  OpenSearch (advanced full-text search)? [y/N]:
+  LDAP authentication (local OpenLDAP with stub users)? [y/N]:
+  SAML / OIDC authentication (local Keycloak IdP)? [y/N]:
+  MinIO (local S3-compatible file storage)? [y/N]:
+  Prometheus + Grafana (metrics and dashboards)? [y/N]:
+  Calls / RTCD (local video/voice calls container)? [y/N]:
+  ngrok tunnel (public HTTPS URL for phone/remote testing)? [y/N]:
+
+── Summary
+  ✓ Mattermost:  mattermost/mattermost-team-edition:10.5.0  (team edition)
+  ✓ Database:    postgres
+  ✓ Topology:    single-node
+  ✓ Output:      Docker Compose
+  ✓ Extras:      none (bare minimum)
+  ✓ MailHog:     always included — captures all outgoing emails
+
+  Generate this environment? [Y/n]:
+```
+
+After confirmation it generates the project and prints the same `cd / make run` next steps.
 
 ---
 
@@ -313,7 +376,8 @@ See [docs/security.md](docs/security.md) for the complete threat model.
 | `mm-repro doctor` | Check Docker, ports, and optional tools |
 | `mm-repro validate --support-package <zip>` | Inspect what's inside a package |
 | `mm-repro plan --support-package <zip>` | Preview the repro plan (no files written) |
-| `mm-repro init --support-package <zip>` | Generate the full repro project |
+| `mm-repro init --support-package <zip>` | Generate from a support package |
+| `mm-repro init` | Interactive wizard (no support package needed) |
 | `mm-repro run --project <dir>` | Start a generated environment |
 | `mm-repro stop --project <dir>` | Stop it |
 | `mm-repro reset --project <dir>` | Wipe all data and start fresh |

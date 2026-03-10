@@ -37,20 +37,22 @@ var (
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Parse a support package and generate a local repro project",
-	Long: `Parse a Mattermost support package and generate a ready-to-run repro
-environment (Docker Compose or Kubernetes) in a new directory.
+	Short: "Generate a local Mattermost environment (from a support package or interactive wizard)",
+	Long: `Generate a ready-to-run Mattermost environment (Docker Compose or Kubernetes).
 
-Example:
-  mm-repro init --support-package ./customer-support-package.zip
+With a support package ZIP — auto-detects version, DB, topology and services:
+  mm-repro init --support-package ./support-package.zip
   mm-repro init --support-package ./sp.zip --with-ldap --with-opensearch
   mm-repro init --support-package ./sp.zip --with-kubernetes
-  mm-repro init --support-package ./sp.zip --output ./my-repros/issue-1234`,
+
+Without a support package — launches an interactive wizard to choose your setup:
+  mm-repro init
+  mm-repro init --output ./my-env`,
 	RunE: runInit,
 }
 
 func init() {
-	initCmd.Flags().StringVar(&initSupportPackage, "support-package", "", "Path to the support package ZIP (required)")
+	initCmd.Flags().StringVar(&initSupportPackage, "support-package", "", "Path to the support package ZIP (optional — omit to use interactive wizard)")
 	initCmd.Flags().StringVar(&initOutputDir, "output", "", "Output directory (default: ./generated-repro/<timestamp>)")
 	initCmd.Flags().StringVar(&initIssueName, "issue", "", "Issue or ticket name for output directory naming")
 	initCmd.Flags().StringVar(&initForceDB, "db", "", "Force database type: postgres|mysql")
@@ -66,19 +68,102 @@ func init() {
 	initCmd.Flags().BoolVar(&initWithKubernetes, "with-kubernetes", false, "Generate Kubernetes manifests (kind) instead of Docker Compose")
 	initCmd.Flags().BoolVar(&initForceDockerCompose, "force-docker-compose", false, "Force Docker Compose output even when a Kubernetes deployment is detected")
 	initCmd.Flags().BoolVar(&initWithNgrok, "with-ngrok", false, "Include ngrok tunnel for mobile/remote access (Docker Compose only)")
-
-	_ = initCmd.MarkFlagRequired("support-package")
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
 	printBanner()
 
-	// Validate support package path
-	if _, err := os.Stat(initSupportPackage); os.IsNotExist(err) {
-		return fmt.Errorf("support package not found: %s", initSupportPackage)
+	var sp *models.SupportPackage
+
+	// ── Path A: wizard (no support package provided) ──────────────────────
+	if initSupportPackage == "" {
+		w := newWizard()
+		wizardSP, wizardFlags, err := w.Run()
+		if err != nil {
+			return err
+		}
+		sp = wizardSP
+
+		// Merge wizard flags with any explicit CLI flags (CLI flags take priority)
+		if !cmd.Flags().Changed("with-kubernetes") {
+			initWithKubernetes = wizardFlags.WithKubernetes
+		}
+		if !cmd.Flags().Changed("force-docker-compose") {
+			initForceDockerCompose = wizardFlags.ForceDockerCompose
+		}
+		if !cmd.Flags().Changed("with-opensearch") {
+			initWithOpenSearch = wizardFlags.WithOpenSearch
+		}
+		if !cmd.Flags().Changed("with-ldap") {
+			initWithLDAP = wizardFlags.WithLDAP
+		}
+		if !cmd.Flags().Changed("with-saml") {
+			initWithSAML = wizardFlags.WithSAML
+		}
+		if !cmd.Flags().Changed("with-minio") {
+			initWithMinIO = wizardFlags.WithMinIO
+		}
+		if !cmd.Flags().Changed("with-grafana") {
+			initWithGrafana = wizardFlags.WithGrafana
+		}
+		if !cmd.Flags().Changed("with-rtcd") {
+			initWithRTCD = wizardFlags.WithRTCD
+		}
+		if !cmd.Flags().Changed("with-ngrok") {
+			initWithNgrok = wizardFlags.WithNgrok
+		}
+		fmt.Println()
+
+	} else {
+		// ── Path B: support package pipeline ─────────────────────────────────
+
+		// Validate support package path
+		if _, err := os.Stat(initSupportPackage); os.IsNotExist(err) {
+			return fmt.Errorf("support package not found: %s", initSupportPackage)
+		}
+
+		printInfo(fmt.Sprintf("Support package: %s", initSupportPackage))
+
+		// Step 1: Ingest
+		printInfo("Step 1/5: Ingesting support package...")
+		tmpDir := filepath.Join(os.TempDir(), "mm-repro-work")
+		ingestor := ingestion.NewIngestor(tmpDir)
+		pkg, err := ingestor.Ingest(initSupportPackage)
+		if err != nil {
+			return fmt.Errorf("ingesting support package: %w", err)
+		}
+		defer pkg.Cleanup()
+		printSuccess(fmt.Sprintf("Extracted %d files from package (format: %s)", len(pkg.RawFiles), pkg.Format))
+
+		// Step 2: Normalize
+		printInfo("Step 2/5: Normalizing package contents...")
+		normalizer := ingestion.NewNormalizer()
+		normalized := normalizer.Normalize(pkg)
+		printSuccess("Package normalized")
+		if len(normalized.Warnings) > 0 {
+			for _, w := range normalized.Warnings {
+				printWarning(w)
+			}
+		}
+
+		// Step 3: Redact
+		printInfo("Step 3/5: Applying redaction rules...")
+		redactor := redaction.NewRedactor(initRedactStrict)
+		redactionReport := redactor.RedactConfig(normalized.Config, initSupportPackage, "config.json")
+		printSuccess(fmt.Sprintf("Redacted %d sensitive values (%d high-severity)",
+			redactionReport.TotalRedacted, redactionReport.HighSeverityCount))
+
+		// Step 4: Parse
+		printInfo("Step 4/5: Parsing support package signals...")
+		p := parser.NewParser()
+		sp = p.Parse(normalized, initSupportPackage)
+		printSuccess(fmt.Sprintf("Mattermost version: %s (edition: %s)", sp.Version.Normalized, sp.Version.Edition))
+		printSuccess(fmt.Sprintf("Database: %s, Topology: nodes=%d cluster=%v",
+			sp.Database.Type, sp.Topology.NodeCount, sp.Topology.IsCluster))
+		printSuccess(fmt.Sprintf("Plugins detected: %d", len(sp.Plugins)))
 	}
 
-	// Determine output directory
+	// ── Determine output directory ─────────────────────────────────────────
 	outputDir := initOutputDir
 	if outputDir == "" {
 		ts := time.Now().Format("20060102-150405")
@@ -88,51 +173,16 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		outputDir = filepath.Join("generated-repro", dirName)
 	}
-
-	printInfo(fmt.Sprintf("Support package: %s", initSupportPackage))
 	printInfo(fmt.Sprintf("Output directory: %s", outputDir))
 	fmt.Println()
 
-	// Step 1: Ingest
-	printInfo("Step 1/5: Ingesting support package...")
-	tmpDir := filepath.Join(os.TempDir(), "mm-repro-work")
-	ingestor := ingestion.NewIngestor(tmpDir)
-	pkg, err := ingestor.Ingest(initSupportPackage)
-	if err != nil {
-		return fmt.Errorf("ingesting support package: %w", err)
+	// ── Step 5 (or 2 in wizard mode): Infer + Generate ────────────────────
+	stepLabel := "Step 5/5"
+	if initSupportPackage == "" {
+		stepLabel = "Step 2/2"
 	}
-	defer pkg.Cleanup()
-	printSuccess(fmt.Sprintf("Extracted %d files from package (format: %s)", len(pkg.RawFiles), pkg.Format))
+	printInfo(fmt.Sprintf("%s: Building repro plan and generating project...", stepLabel))
 
-	// Step 2: Normalize
-	printInfo("Step 2/5: Normalizing package contents...")
-	normalizer := ingestion.NewNormalizer()
-	normalized := normalizer.Normalize(pkg)
-	printSuccess("Package normalized")
-	if len(normalized.Warnings) > 0 {
-		for _, w := range normalized.Warnings {
-			printWarning(w)
-		}
-	}
-
-	// Step 3: Redact
-	printInfo("Step 3/5: Applying redaction rules...")
-	redactor := redaction.NewRedactor(initRedactStrict)
-	redactionReport := redactor.RedactConfig(normalized.Config, initSupportPackage, "config.json")
-	printSuccess(fmt.Sprintf("Redacted %d sensitive values (%d high-severity)",
-		redactionReport.TotalRedacted, redactionReport.HighSeverityCount))
-
-	// Step 4: Parse
-	printInfo("Step 4/5: Parsing support package signals...")
-	p := parser.NewParser()
-	sp := p.Parse(normalized, initSupportPackage)
-	printSuccess(fmt.Sprintf("Mattermost version: %s (edition: %s)", sp.Version.Normalized, sp.Version.Edition))
-	printSuccess(fmt.Sprintf("Database: %s, Topology: nodes=%d cluster=%v",
-		sp.Database.Type, sp.Topology.NodeCount, sp.Topology.IsCluster))
-	printSuccess(fmt.Sprintf("Plugins detected: %d", len(sp.Plugins)))
-
-	// Step 5: Infer + Generate
-	printInfo("Step 5/5: Building repro plan and generating project...")
 	flags := models.ReproFlags{
 		ForceDB:            initForceDB,
 		ForceSingleNode:    initForceSingle,
@@ -161,7 +211,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	printSuccess(fmt.Sprintf("Generated %d files in: %s", len(created), outputDir))
 	fmt.Println()
 
-	// Print summary
+	// ── Final summary ──────────────────────────────────────────────────────
 	fmt.Println("─────────────────────────────────────────────────")
 	fmt.Printf("  Image:    %s:%s\n", plan.MattermostImage, plan.Services.Mattermost.Tag)
 	fmt.Printf("  Topology: %s (%d node(s))\n", plan.Topology, plan.NodeCount)
@@ -197,7 +247,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("Review the reports:\n")
 	fmt.Printf("  cat %s/REPRO_SUMMARY.md\n", outputDir)
-	fmt.Printf("  cat %s/REDACTION_REPORT.md\n", outputDir)
+	if initSupportPackage != "" {
+		fmt.Printf("  cat %s/REDACTION_REPORT.md\n", outputDir)
+	}
 
 	return nil
 }
