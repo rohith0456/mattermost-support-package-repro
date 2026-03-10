@@ -10,17 +10,15 @@
 
 ## The Problem It Solves
 
-A customer files a ticket. You need to reproduce their Mattermost issue locally.
+Reproducing a Mattermost issue locally means figuring out the exact server version, database type, auth setup, file storage config, and more — then manually wiring it all up. That's hours of work before you've even started debugging.
 
-Normally: **hours of manual setup** — hunting down the right version, wiring up their database type, recreating their auth config.
-
-With mm-repro: **one command.**
+mm-repro reads a Mattermost support package ZIP and does it for you — **one command:**
 
 ```bash
-mm-repro init --support-package ./customer-support-package.zip
+mm-repro init --support-package ./support-package.zip
 ```
 
-It reads the ZIP, figures out their exact setup, and generates a ready-to-run environment — Docker Compose **or** Kubernetes, matching their version and config, with all secrets safely replaced. Then:
+It figures out the exact setup from the package and generates a ready-to-run environment — Docker Compose **or** Kubernetes, matching the version and config, with all secrets safely replaced. Then:
 
 ```bash
 cd generated-repro/<timestamp>/
@@ -60,12 +58,12 @@ mm-repro doctor
 ### 3 — Run It
 
 ```bash
-mm-repro init --support-package ~/Downloads/customer.zip
+mm-repro init --support-package ~/Downloads/support-package.zip
 cd generated-repro/<timestamp>/
 make run
 ```
 
-Open `http://localhost:8065` — Mattermost is running, matching the customer's version and config. All emails go to MailHog at `http://localhost:8025`, nothing real gets sent.
+Open `http://localhost:8065` — Mattermost is running, matching the exact version and config from the support package. All emails go to MailHog at `http://localhost:8025`, nothing real gets sent.
 
 ### 4 — Reproduce, then Clean Up
 
@@ -118,10 +116,10 @@ No manual YAML editing. No hunting for the right image tag. No credential leaks.
 
 ## Add More Services
 
-Need to match a more complex customer setup? Just add flags:
+Need to match a more complex setup? Just add flags:
 
 ```bash
-mm-repro init --support-package ./customer.zip \
+mm-repro init --support-package ./support-package.zip \
   --with-ldap          # OpenLDAP (LDAP authentication)
   --with-saml          # Keycloak (SAML / OIDC)
   --with-opensearch    # OpenSearch (search issues)
@@ -131,7 +129,7 @@ mm-repro init --support-package ./customer.zip \
   --with-kubernetes    # generate kind manifests instead of Compose
 ```
 
-Mix and match whatever matches the customer's stack.
+Mix and match whatever the environment needs.
 
 ---
 
@@ -174,7 +172,7 @@ When `--with-ldap` is included, all users are pre-loaded in OpenLDAP too.
 Add `--with-ngrok` to get a public HTTPS URL you can open on any device:
 
 ```bash
-mm-repro init --support-package ./customer.zip --with-ngrok
+mm-repro init --support-package ./support-package.zip --with-ngrok
 cd generated-repro/<timestamp>/
 make run
 
@@ -195,7 +193,7 @@ Get one free at [dashboard.ngrok.com](https://dashboard.ngrok.com/get-started/yo
 If the support package came from a **multi-node (High Availability) deployment**, mm-repro auto-detects this and spins up multiple Mattermost containers behind an nginx load balancer — no extra flags needed:
 
 ```bash
-mm-repro init --support-package ./customer.zip
+mm-repro init --support-package ./support-package.zip
 # → Topology: multi-node (3 nodes detected)
 # → nginx load balancer + MinIO (shared file storage) auto-enabled
 
@@ -211,9 +209,9 @@ open http://localhost:8065   # nginx routes to any of the nodes
 
 Or force it explicitly:
 ```bash
-mm-repro init --support-package ./customer.zip --force-multi-node
+mm-repro init --support-package ./support-package.zip --force-multi-node
 # Force single-node even when cluster was detected:
-mm-repro init --support-package ./customer.zip --force-single-node
+mm-repro init --support-package ./support-package.zip --force-single-node
 ```
 
 > Note: if the original cluster had more than 3 nodes, it's capped at 3. The `REPRO_SUMMARY.md` will note the approximation.
@@ -225,7 +223,7 @@ mm-repro init --support-package ./customer.zip --force-single-node
 If the support package came from a Kubernetes deployment, mm-repro **auto-detects** this and generates a local [kind](https://kind.sigs.k8s.io/) cluster instead of Docker Compose:
 
 ```bash
-mm-repro init --support-package ./customer.zip
+mm-repro init --support-package ./support-package.zip
 # → Output: kubernetes  (auto-detected from pod naming patterns)
 
 cd generated-repro/<timestamp>/
@@ -235,9 +233,9 @@ open http://localhost:30065
 
 Or force it explicitly:
 ```bash
-mm-repro init --support-package ./customer.zip --with-kubernetes
+mm-repro init --support-package ./support-package.zip --with-kubernetes
 # Force Compose even when k8s is detected:
-mm-repro init --support-package ./customer.zip --force-docker-compose
+mm-repro init --support-package ./support-package.zip --force-docker-compose
 ```
 
 **Prerequisites for k8s mode:** Docker Desktop + [kind](https://kind.sigs.k8s.io/docs/user/quick-start/) + [kubectl](https://kubernetes.io/docs/tasks/tools/)
@@ -248,11 +246,11 @@ See [docs/kubernetes.md](docs/kubernetes.md) for the full Kubernetes guide.
 
 ## Security: Safe by Default
 
-mm-repro is built so you can't accidentally leak customer data:
+mm-repro is built so you can't accidentally leak sensitive data:
 
 - 🔐 **Secrets are replaced** — passwords, keys, DSNs, tokens all become safe `*_local_repro_only` placeholders
 - 📧 **Email is captured** — MailHog intercepts everything, nothing reaches real inboxes
-- 🚫 **No outbound connections** — zero telemetry, zero calls to customer infrastructure
+- 🚫 **No outbound connections** — zero telemetry, zero calls to external infrastructure
 - 📋 **Full audit trail** — `REDACTION_REPORT.md` lists every credential that was detected and replaced
 - 🗑️ **Original ZIP untouched** — mm-repro only reads it, never modifies it
 
