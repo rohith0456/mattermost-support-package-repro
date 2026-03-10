@@ -21,7 +21,7 @@ mm-repro init --support-package ./customer-support-package.zip
 ```
 
 **Generates:**
-- A ready-to-run Docker Compose environment
+- A ready-to-run Docker Compose **or Kubernetes (kind)** environment — automatically chosen based on the customer's deployment
 - Matching Mattermost version (or closest available)
 - Matching database type (PostgreSQL or MySQL)
 - Optional services: OpenSearch, LDAP, Keycloak, MinIO, MailHog, Prometheus, Grafana
@@ -32,7 +32,8 @@ Then start with:
 ```bash
 cd generated-repro/<timestamp>/
 make run
-# open http://localhost:8065
+# Docker Compose:  open http://localhost:8065
+# Kubernetes/kind: open http://localhost:30065
 ```
 
 ---
@@ -98,12 +99,16 @@ mm-repro will:
 **Optional flags** — add any that match the customer's setup:
 ```bash
 mm-repro init --support-package ~/Downloads/customer.zip \
-  --with-ldap        # include OpenLDAP (LDAP auth)
-  --with-saml        # include Keycloak (SAML / OIDC auth)
-  --with-opensearch  # include OpenSearch (search issues)
-  --with-minio       # include MinIO (S3 file storage)
-  --with-grafana     # include Prometheus + Grafana (metrics)
+  --with-ldap              # include OpenLDAP (LDAP auth)
+  --with-saml              # include Keycloak (SAML / OIDC auth)
+  --with-opensearch        # include OpenSearch (search issues)
+  --with-minio             # include MinIO (S3 file storage)
+  --with-grafana           # include Prometheus + Grafana (metrics)
+  --with-kubernetes        # generate Kubernetes manifests (kind) instead of Docker Compose
+  --force-docker-compose   # override auto-detection, always use Docker Compose
 ```
+
+> **Kubernetes auto-detection:** If the customer's support package shows k8s pod naming patterns or cluster signals, mm-repro will automatically generate Kubernetes manifests instead of Docker Compose. See [Kubernetes Support](#kubernetes-support) below.
 
 ---
 
@@ -116,9 +121,8 @@ make run
 
 Wait about 30–60 seconds for all containers to come up (Keycloak takes the longest). Then open:
 
-```
-http://localhost:8065
-```
+- **Docker Compose:** `http://localhost:8065`
+- **Kubernetes (kind):** `http://localhost:30065`
 
 You'll see a fresh Mattermost instance matching the customer's version and configuration.
 
@@ -191,6 +195,112 @@ Then delete the generated folder and the support package ZIP from your machine.
 
 ---
 
+## Kubernetes Support
+
+When a customer runs Mattermost on Kubernetes, mm-repro detects this automatically from the support package and generates a local [kind](https://kind.sigs.k8s.io/) cluster instead of Docker Compose.
+
+### Auto-detection
+
+mm-repro looks for these signals in the support package:
+- Pod naming patterns in `cluster_info.json` — e.g. `mattermost-7d8f4b5c6-2xzpk` (Deployment pod) or `mattermost-0` (StatefulSet pod)
+- SiteURL containing `.cluster.local`, `.svc.`, or `kubernetes`
+
+When detected, the output format is automatically set to `kubernetes`. The summary will show:
+```
+Output:   kubernetes
+```
+
+### Force Kubernetes or Docker Compose
+
+```bash
+# Always generate Kubernetes manifests (for any support package)
+mm-repro init --support-package ./customer.zip --with-kubernetes
+
+# Always use Docker Compose even if k8s is detected
+mm-repro init --support-package ./customer.zip --force-docker-compose
+```
+
+### Prerequisites for Kubernetes
+
+| Tool | Purpose | Install |
+|------|---------|---------|
+| Docker Desktop | Container runtime | [docker.com](https://www.docker.com/products/docker-desktop/) |
+| kind | Kubernetes in Docker (local cluster) | [kind.sigs.k8s.io](https://kind.sigs.k8s.io/docs/user/quick-start/) |
+| kubectl | Apply manifests & view pods | [kubernetes.io](https://kubernetes.io/docs/tasks/tools/) |
+
+Check availability:
+```bash
+mm-repro doctor
+# Shows [optional] kubectl and kind checks
+```
+
+### Generated Kubernetes Layout
+
+```
+generated-repro/<timestamp>/
+├── kubernetes/
+│   ├── 00-namespace.yaml       # mattermost-repro namespace
+│   ├── 01-postgres.yaml        # PostgreSQL Deployment + Service + PVC
+│   ├── 02-mailhog.yaml         # MailHog Deployment + Service
+│   ├── 03-opensearch.yaml      # (optional) OpenSearch
+│   ├── 04-openldap.yaml        # (optional) OpenLDAP
+│   ├── 05-keycloak.yaml        # (optional) Keycloak OIDC
+│   ├── 06-minio.yaml           # (optional) MinIO
+│   ├── 07-mattermost.yaml      # ConfigMap + Deployment/StatefulSet + NodePort
+│   └── kustomization.yaml      # Kustomize resource list
+├── Makefile
+├── scripts/
+│   ├── start.sh
+│   ├── stop.sh
+│   └── reset.sh
+└── ... (reports, repro-plan.json)
+```
+
+### Single-node vs Multi-node on Kubernetes
+
+| Topology | Resource | Access |
+|----------|---------|--------|
+| Single-node | `Deployment` (1 replica) | `http://localhost:30065` |
+| Multi-node HA | `StatefulSet` (N replicas) | `http://localhost:30065` |
+
+### Kubernetes Service URLs
+
+| Service | URL |
+|---------|-----|
+| Mattermost | http://localhost:30065 |
+| MailHog UI | http://localhost:30025 |
+| Keycloak (if enabled) | http://localhost:30080 |
+| MinIO console (if enabled) | http://localhost:30901 |
+
+### Kubernetes Workflow
+
+```bash
+# Generate
+mm-repro init --support-package ./customer.zip
+# → Output: kubernetes  (auto-detected or forced with --with-kubernetes)
+
+cd generated-repro/<timestamp>/
+
+# Start (creates kind cluster + applies manifests)
+make run
+
+# View pod status
+make status
+
+# Follow logs
+make logs
+
+# Stop (keep cluster + data)
+make stop
+
+# Reset (delete entire cluster — all data lost)
+make reset
+```
+
+See [docs/kubernetes.md](docs/kubernetes.md) for full details.
+
+---
+
 ## Why It Exists
 
 Setting up a local environment to reproduce a Mattermost issue is slow, manual, and easy to get wrong. `mm-repro` automates that entirely — point it at a support package ZIP and get a running local environment in minutes, with no manual config and no risk of leaking real credentials.
@@ -204,8 +314,9 @@ Setting up a local environment to reproduce a Mattermost issue is slow, manual, 
 | Feature | Approach |
 |---------|----------|
 | Mattermost version | Exact Docker image tag when available |
-| Single-node topology | Local Docker container |
-| Multi-node HA cluster | Multiple local containers + nginx |
+| Single-node topology | Local Docker container (Compose) or kind Deployment (Kubernetes) |
+| Multi-node HA cluster | Multiple local containers + nginx (Compose) or StatefulSet (Kubernetes) |
+| Kubernetes deployment | Local kind cluster with matching manifest layout |
 | PostgreSQL database | Local PostgreSQL container |
 | MySQL database | Local MySQL container (when detected) |
 | Elasticsearch/OpenSearch | Local OpenSearch container |
@@ -329,6 +440,12 @@ mm-repro init --support-package ./customer.zip --with-opensearch
 # Full stack
 mm-repro init --support-package ./customer.zip \
   --with-ldap --with-opensearch --with-minio --with-grafana
+
+# Kubernetes repro (auto-detected, or force it)
+mm-repro init --support-package ./customer.zip --with-kubernetes
+
+# Kubernetes + LDAP
+mm-repro init --support-package ./customer.zip --with-kubernetes --with-ldap
 ```
 
 ---
@@ -351,6 +468,8 @@ Flags:
   --with-minio               Include MinIO (S3 storage)
   --with-rtcd                Include RTCD (Calls)
   --with-grafana             Include Prometheus + Grafana
+  --with-kubernetes          Generate Kubernetes manifests (kind) instead of Docker Compose
+  --force-docker-compose     Force Docker Compose even when Kubernetes is auto-detected
   --redact-strict            Strict redaction (also redacts server addresses, emails)
 ```
 
@@ -409,7 +528,7 @@ mm-repro init --support-package ./customer.zip
          │
          ▼
 ┌──────────────────┐
-│Generator Layer   │  Render docker-compose.yml, .env, reports, README
+│Generator Layer   │  Render docker-compose.yml / Kubernetes manifests, reports, README
 └────────┬─────────┘
          │
          ▼
@@ -434,6 +553,7 @@ See [docs/architecture.md](docs/architecture.md) for details.
 - Calls: RTCD
 - Observability: Prometheus, Grafana
 - Topology: single-node, multi-node (up to 3 nodes locally)
+- Deployment targets: Docker Compose, Kubernetes (kind) — auto-detected or forced
 - Plugins: auto-install from official marketplace
 
 ---
@@ -471,6 +591,18 @@ If the exact version image doesn't exist on Docker Hub, the tool will use a near
 
 ### Keycloak takes a long time to start
 Keycloak can take 2-3 minutes to initialize. Use `make logs` to monitor.
+
+### Kubernetes: `kind: command not found`
+Install kind from https://kind.sigs.k8s.io/docs/user/quick-start/ and add it to your PATH. Verify with `mm-repro doctor`.
+
+### Kubernetes: pods stuck in `Pending`
+kind uses Docker Desktop's resource limits. Ensure Docker Desktop has at least **4 GB RAM** allocated (Preferences → Resources → Memory).
+
+### Kubernetes: expected Docker Compose but got manifests
+The tool detected Kubernetes signals in the support package. Use `--force-docker-compose` to override if you prefer Compose:
+```bash
+mm-repro init --support-package ./customer.zip --force-docker-compose
+```
 
 ---
 
@@ -512,6 +644,7 @@ A: No. The `.gitignore` in `generated/` prevents this. The `.env` file contains 
 
 Each generated project contains:
 
+**Docker Compose project:**
 ```
 generated-repro/<timestamp>/
 ├── docker-compose.yml      # All services configured for local use
@@ -522,12 +655,36 @@ generated-repro/<timestamp>/
 │   ├── start.sh
 │   ├── stop.sh
 │   └── reset.sh
-├── README.md               # Project-specific quick start
-├── REPRO_SUMMARY.md        # What was recreated / approximated / skipped
-├── REDACTION_REPORT.md     # What was redacted from the support package
-├── PLUGIN_REPORT.md        # Plugin detection and installation status
-└── repro-plan.json         # Machine-readable full plan
+├── README.md
+├── REPRO_SUMMARY.md
+├── REDACTION_REPORT.md
+├── PLUGIN_REPORT.md
+└── repro-plan.json         # Machine-readable full plan (output_format: "docker-compose")
 ```
+
+**Kubernetes project (auto-detected or `--with-kubernetes`):**
+```
+generated-repro/<timestamp>/
+├── kubernetes/
+│   ├── 00-namespace.yaml
+│   ├── 01-postgres.yaml
+│   ├── 02-mailhog.yaml
+│   ├── 03-*.yaml           # optional services (opensearch, ldap, keycloak, minio)
+│   ├── NN-mattermost.yaml  # ConfigMap + Deployment/StatefulSet + NodePort Services
+│   └── kustomization.yaml
+├── Makefile                # kind-aware: run / stop / reset / logs / status
+├── scripts/
+│   ├── start.sh
+│   ├── stop.sh
+│   └── reset.sh
+├── README.md
+├── REPRO_SUMMARY.md
+├── REDACTION_REPORT.md
+├── PLUGIN_REPORT.md
+└── repro-plan.json         # Machine-readable full plan (output_format: "kubernetes")
+```
+
+The `output_format` field in `repro-plan.json` is read by `mm-repro run/stop/reset` to automatically select the right launcher (Docker Compose or kubectl+kind).
 
 ---
 
