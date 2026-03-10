@@ -12,7 +12,7 @@
 
 A customer files a ticket. You need to reproduce their Mattermost issue locally.
 
-Normally: **hours of manual setup** — hunting down the right version, wiring up their database type, recreating their auth config, hoping you didn't accidentally use a real credential somewhere.
+Normally: **hours of manual setup** — hunting down the right version, wiring up their database type, recreating their auth config.
 
 With mm-repro: **one command.**
 
