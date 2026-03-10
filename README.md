@@ -231,18 +231,28 @@ When `--with-ldap` is included, all users are pre-loaded in OpenLDAP too.
 
 ---
 
-## Service URLs at a Glance
+## Services at a Glance
 
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| **Mattermost** | http://localhost:8065 | Users above |
-| **nginx** (multi-node load balancer) | http://localhost:8065 | — routes to all nodes |
-| **MailHog** (email capture) | http://localhost:8025 | No login |
-| **MinIO** (S3 storage) | http://localhost:9001 | `minioadmin` / `minio_local_repro_only` |
-| **Keycloak** (SAML/OIDC) | http://localhost:8080 | `admin` / `keycloak_admin_local_repro_only` |
-| **phpLDAPadmin** | http://localhost:8089 | `cn=admin,dc=repro,dc=local` / `ldap_admin_local_repro_only` |
-| **Grafana** | http://localhost:3000 | `admin` / `admin` |
-| **ngrok inspector** | http://localhost:4040 | No login |
+Every service mm-repro can spin up, what it does, and how to reach it:
+
+| Service | What it does | URL | Credentials |
+|---------|-------------|-----|-------------|
+| **Mattermost** | The collaboration platform itself — what you're testing | http://localhost:8065 | Default users above |
+| **PostgreSQL** | Relational database that stores all Mattermost data (channels, messages, users) | internal | auto-generated |
+| **MySQL** | Alternative to PostgreSQL — used when detected in the package or forced with `--db mysql` | internal | auto-generated |
+| **MailHog** | Catches every outgoing email so nothing reaches real inboxes; view captured emails in its web UI | http://localhost:8025 | No login |
+| **nginx** | Load balancer in front of all Mattermost nodes in HA mode — distributes traffic evenly across the cluster | http://localhost:8065 | routes to all nodes |
+| **MinIO** | Local S3-compatible object storage — Mattermost stores file attachments here instead of on disk; required for HA so all nodes share one storage backend | http://localhost:9001 | `minioadmin` / `minio_local_repro_only` |
+| **OpenSearch** | Full-text search engine — faster and richer than database search; drop-in open-source replacement for Elasticsearch | http://localhost:9200 | No login |
+| **OpenLDAP** | LDAP directory server pre-loaded with stub test users for testing LDAP authentication flows | internal | auto-generated |
+| **phpLDAPadmin** | Web UI to browse and manage the OpenLDAP directory — view users, groups, and attributes | http://localhost:8089 | `cn=admin,dc=repro,dc=local` / `ldap_admin_local_repro_only` |
+| **Keycloak** | Identity provider for testing SAML 2.0 and OIDC single-sign-on authentication | http://localhost:8080 | `admin` / `keycloak_admin_local_repro_only` |
+| **Prometheus** | Scrapes and stores performance metrics from Mattermost every 15 seconds | http://localhost:9090 | No login |
+| **Grafana** | Dashboard for visualising Prometheus metrics — API latency, DB queries, memory, active users | http://localhost:3000 | `admin` / `admin` |
+| **RTCD** | Real-Time Communications Daemon — handles WebRTC signalling for Mattermost Calls (video/voice) | internal | auto-generated |
+| **ngrok** | Creates a public HTTPS tunnel so you can open Mattermost on a phone or share it remotely | http://localhost:4040 (inspector) | No login |
+
+> Services listed as **internal** are not exposed on a host port — Mattermost connects to them over Docker's internal network.
 
 ---
 
