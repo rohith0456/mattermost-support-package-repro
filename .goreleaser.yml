@@ -47,7 +47,8 @@ snapshot:
 
 changelog:
   sort: asc
-  use: github
+  # use: git — avoids GitHub API calls (no timeout / rate-limit risk)
+  use: git
   filters:
     exclude:
       - "^docs:"
@@ -67,8 +68,9 @@ changelog:
 
 release:
   github:
-    owner: mattermost
+    owner: rohith0456
     name: mattermost-support-package-repro
+  replace_existing_artifacts: true
   draft: false
   prerelease: auto
   name_template: "mm-repro {{.Tag}}"
