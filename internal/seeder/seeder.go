@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"mime/multipart"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -28,12 +29,14 @@ type Seeder struct {
 
 // Options controls what gets seeded.
 type Options struct {
-	SiteURL   string // e.g. http://localhost:8065
-	Username  string // Mattermost admin username
-	Password  string // Mattermost admin password
-	PostCount int    // number of posts to create (default 20)
-	WithFiles bool   // attach test images and text files
-	Verbose   bool
+	SiteURL     string   // e.g. http://localhost:8065
+	Username    string   // Mattermost admin username
+	Password    string   // Mattermost admin password
+	PostCount   int      // number of posts to create (default 20)
+	WithFiles   bool     // attach test images and text files
+	Verbose     bool
+	Channels    []string // extra channels to create (in addition to town-square / off-topic)
+	PostChannel string   // if set, seed ALL posts into this channel only
 }
 
 // New creates a Seeder targeting the given base URL.
@@ -71,12 +74,12 @@ func (s *Seeder) Run(opts Options) error {
 	}
 	fmt.Printf("  ✓ Team ready\n")
 
-	if err := s.resolveChannels(); err != nil {
+	if err := s.resolveChannels(opts); err != nil {
 		return fmt.Errorf("channel setup: %w", err)
 	}
 	fmt.Printf("  ✓ Channels ready (%d found)\n", len(s.chans))
 
-	count, err := s.seedPosts(opts.PostCount, opts.WithFiles)
+	count, err := s.seedPosts(opts.PostCount, opts.WithFiles, opts.PostChannel)
 	if err != nil {
 		return fmt.Errorf("seeding posts: %w", err)
 	}
@@ -214,7 +217,7 @@ func (s *Seeder) ensureTeam() error {
 
 // ─── channels ───────────────────────────────────────────────────────────────
 
-func (s *Seeder) resolveChannels() error {
+func (s *Seeder) resolveChannels(opts Options) error {
 	var channels []struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
@@ -225,7 +228,7 @@ func (s *Seeder) resolveChannels() error {
 	for _, c := range channels {
 		s.chans[c.Name] = c.ID
 	}
-	// ensure off-topic exists
+	// ensure default channels exist
 	for _, name := range []string{"town-square", "off-topic"} {
 		if _, ok := s.chans[name]; !ok {
 			var ch struct{ ID string `json:"id"` }
@@ -239,7 +242,42 @@ func (s *Seeder) resolveChannels() error {
 			}
 		}
 	}
+	// create any user-requested extra channels
+	for _, displayName := range opts.Channels {
+		slug := toSlug(displayName)
+		if slug == "" {
+			continue
+		}
+		if _, ok := s.chans[slug]; !ok {
+			var ch struct{ ID string `json:"id"` }
+			if err := s.doJSON("POST", "/api/v4/channels", map[string]interface{}{
+				"team_id":      s.teamID,
+				"name":         slug,
+				"display_name": displayName,
+				"type":         "O",
+			}, &ch); err == nil {
+				s.chans[slug] = ch.ID
+				fmt.Printf("  ✓ Created channel ~%s\n", slug)
+			}
+		}
+	}
 	return nil
+}
+
+// toSlug converts a human-readable channel name to a valid Mattermost channel name:
+// lowercase, spaces and underscores replaced with hyphens, non-alphanumeric stripped,
+// consecutive hyphens collapsed, leading/trailing hyphens trimmed.
+var slugNonAlnum = regexp.MustCompile(`[^a-z0-9-]+`)
+var slugMultiHyphen = regexp.MustCompile(`-{2,}`)
+
+func toSlug(name string) string {
+	s := strings.ToLower(name)
+	s = strings.ReplaceAll(s, "_", "-")
+	s = strings.ReplaceAll(s, " ", "-")
+	s = slugNonAlnum.ReplaceAllString(s, "")
+	s = slugMultiHyphen.ReplaceAllString(s, "-")
+	s = strings.Trim(s, "-")
+	return s
 }
 
 func (s *Seeder) chanID(name string) string {
@@ -383,8 +421,18 @@ var emojiSet = []string{"thumbsup", "tada", "white_check_mark", "rocket", "fire"
 
 // ─── main seed loop ───────────────────────────────────────────────────────────
 
-func (s *Seeder) seedPosts(count int, withFiles bool) (int, error) {
+func (s *Seeder) seedPosts(count int, withFiles bool, postChannel string) (int, error) {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	// Resolve the target channel slug (empty = distribute across defaults).
+	targetSlug := ""
+	if postChannel != "" {
+		targetSlug = toSlug(postChannel)
+		if _, ok := s.chans[targetSlug]; !ok {
+			// Channel not found — fall back to default distribution silently.
+			targetSlug = ""
+		}
+	}
 
 	templates := postTemplates
 	// If count is larger than templates, pad with timestamped extras
@@ -396,6 +444,13 @@ func (s *Seeder) seedPosts(count int, withFiles bool) (int, error) {
 		})
 	}
 	templates = templates[:count]
+
+	// If a specific channel was requested, redirect all templates there.
+	if targetSlug != "" {
+		for i := range templates {
+			templates[i].channel = targetSlug
+		}
+	}
 
 	// Track the first post in each channel for thread replies
 	threadRoots := map[string]string{}

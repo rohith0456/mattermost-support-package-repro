@@ -193,6 +193,7 @@ func ldapService() string {
     volumes:
       - ldap_data:/var/lib/ldap
       - ldap_config:/etc/ldap/slapd.d
+      - ./ldap:/ldap:ro
     networks:
       - mm-repro
 

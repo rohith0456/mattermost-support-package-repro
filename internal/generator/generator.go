@@ -114,6 +114,12 @@ func (g *Generator) Generate() ([]string, error) {
 				fn   func() (string, error)
 			}{"nginx/nginx.conf", g.generateNginxConfig})
 		}
+		if g.plan.Services.Auth.LDAPEnabled {
+			tasks = append(tasks, struct {
+				name string
+				fn   func() (string, error)
+			}{"ldap/users.ldif", g.generateLDIF})
+		}
 	}
 
 	for _, task := range tasks {
@@ -197,6 +203,29 @@ mobile: ngrok-url
 `
 	}
 
+	k8sLdapTargets := ""
+	if g.plan.Services.Auth.LDAPEnabled {
+		k8sLdapTargets = `
+## ldap-users: Load test LDAP users into OpenLDAP (run once after 'make run')
+## Re-run safely — existing entries are skipped automatically.
+## Users: alice.johnson bob.smith carol.white dave.brown eve.davis frank.miller grace.wilson henry.moore
+## Password for all users: Repro1234!
+ldap-users:
+	@echo "Loading test LDAP users..."
+	@kubectl -n $(NS) exec deploy/openldap -- \
+	  ldapadd -x \
+	  -D "cn=admin,dc=repro,dc=local" \
+	  -w "ldap_admin_local_repro_only" \
+	  -f /ldap/users.ldif 2>&1 | grep -v "already exists" || true
+	@echo "Done. User password: Repro1234!"
+`
+	}
+
+	k8sPhonyExtra := ""
+	if g.plan.Services.Auth.LDAPEnabled {
+		k8sPhonyExtra += " ldap-users"
+	}
+
 	content := `# Generated Kubernetes Repro Makefile
 # Run: make run   (creates kind cluster + applies manifests)
 # Stop: make stop
@@ -206,7 +235,7 @@ CLUSTER  := mm-repro
 NS       := mattermost-repro
 MANIFEST := kubernetes/
 
-.PHONY: run stop reset logs status admin ngrok ngrok-url mobile
+.PHONY: run stop reset logs status admin seed channels ngrok ngrok-url mobile` + k8sPhonyExtra + `
 
 ## run: Create kind cluster (if needed) and apply all manifests
 run:
@@ -251,11 +280,24 @@ admin:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 ## seed: Seed test posts, images and reactions (run after 'make admin')
-## Usage: make seed PASS=Sysadmin1!
+## Usage:   make seed PASS=Sysadmin1!
+## Options: CHANNELS="support,bugs"  — also create these channels
+##          CHANNEL=support          — post only into this channel
 seed:
 	@which mm-repro > /dev/null 2>&1 || (echo "mm-repro not found. Install: go install github.com/rohith0456/mattermost-support-package-repro/cmd/mm-repro@latest" && exit 1)
-	mm-repro seed --url http://localhost:30065 --project . $(if $(PASS),--password $(PASS),)
-` + ngrokTargets
+	mm-repro seed --url http://localhost:30065 --project . \
+	  $(if $(PASS),--password $(PASS),) \
+	  $(if $(CHANNELS),--channels "$(CHANNELS)",) \
+	  $(if $(CHANNEL),--channel "$(CHANNEL)",)
+
+## channels: Create one or more channels by name (run after 'make admin')
+## Usage: make channels NAMES="support,bugs,release-notes" PASS=Sysadmin1!
+channels:
+	@which mm-repro > /dev/null 2>&1 || (echo "mm-repro not found. Install: go install github.com/rohith0456/mattermost-support-package-repro/cmd/mm-repro@latest" && exit 1)
+	@test -n "$(NAMES)" || (echo "Usage: make channels NAMES=\"chan1,chan2\" PASS=Sysadmin1!" && exit 1)
+	mm-repro seed --url http://localhost:30065 --project . --posts 0 --channels "$(NAMES)" $(if $(PASS),--password $(PASS),)
+	@echo "Channels created."
+` + k8sLdapTargets + ngrokTargets
 	return g.writeFile("Makefile", content)
 }
 
@@ -339,6 +381,32 @@ mobile: ngrok-url
 `
 	}
 
+	ldapTargets := ""
+	if g.plan.Services.Auth.LDAPEnabled {
+		ldapTargets = `
+## ldap-users: Load test LDAP users into OpenLDAP (run once after 'make run')
+## Re-run safely — existing entries are skipped automatically.
+## Users: alice.johnson bob.smith carol.white dave.brown eve.davis frank.miller grace.wilson henry.moore
+## Password for all users: Repro1234!
+ldap-users:
+	@echo "Loading test LDAP users..."
+	@$(COMPOSE) -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec -T openldap \
+	  ldapadd -x \
+	  -D "cn=admin,dc=repro,dc=local" \
+	  -w "ldap_admin_local_repro_only" \
+	  -f /ldap/users.ldif 2>&1 | grep -v "already exists" || true
+	@echo "Done. Verify at http://localhost:8089  (phpLDAPadmin)"
+	@echo "  Bind DN  : cn=admin,dc=repro,dc=local"
+	@echo "  Password : ldap_admin_local_repro_only"
+	@echo "  User pwd : Repro1234!"
+`
+	}
+
+	phonyExtra := ""
+	if g.plan.Services.Auth.LDAPEnabled {
+		phonyExtra += " ldap-users"
+	}
+
 	content := `# Generated Repro Makefile
 # Run: make run
 # Stop: make stop
@@ -348,7 +416,7 @@ COMPOSE := docker compose
 COMPOSE_FILE := docker-compose.yml
 ENV_FILE := .env
 
-.PHONY: run pull stop reset logs ps health admin seed ngrok-url mobile
+.PHONY: run pull stop reset logs ps health admin seed channels ngrok-url mobile` + phonyExtra + `
 
 ## run: Pull images (ensures platform-correct versions) then start all services
 ## On Apple Silicon this prevents "no matching manifest" / platform cache errors.
@@ -402,12 +470,25 @@ admin:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 ## seed: Seed test posts, images and reactions (run after 'make admin')
-## Usage: make seed PASS=Sysadmin1!
-## Or:   mm-repro seed --project . --with-files --password Sysadmin1!
+## Usage:   make seed PASS=Sysadmin1!
+## Options: CHANNELS="support,bugs"  — also create these channels
+##          CHANNEL=support          — post only into this channel
+## Or:      mm-repro seed --project . --with-files --password Sysadmin1!
 seed:
 	@which mm-repro > /dev/null 2>&1 || (echo "mm-repro not found. Install: go install github.com/rohith0456/mattermost-support-package-repro/cmd/mm-repro@latest" && exit 1)
-	mm-repro seed --project . $(if $(PASS),--password $(PASS),)
-` + ngrokTargets
+	mm-repro seed --project . \
+	  $(if $(PASS),--password $(PASS),) \
+	  $(if $(CHANNELS),--channels "$(CHANNELS)",) \
+	  $(if $(CHANNEL),--channel "$(CHANNEL)",)
+
+## channels: Create one or more channels by name (run after 'make admin')
+## Usage: make channels NAMES="support,bugs,release-notes" PASS=Sysadmin1!
+channels:
+	@which mm-repro > /dev/null 2>&1 || (echo "mm-repro not found. Install: go install github.com/rohith0456/mattermost-support-package-repro/cmd/mm-repro@latest" && exit 1)
+	@test -n "$(NAMES)" || (echo "Usage: make channels NAMES=\"chan1,chan2\" PASS=Sysadmin1!" && exit 1)
+	mm-repro seed --project . --posts 0 --channels "$(NAMES)" $(if $(PASS),--password $(PASS),)
+	@echo "Channels created."
+` + ldapTargets + ngrokTargets
 	return g.writeFile("Makefile", content)
 }
 

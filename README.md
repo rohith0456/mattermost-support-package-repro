@@ -92,13 +92,29 @@ Once Mattermost is running and you've logged in at least once, populate it with 
 make seed PASS=Sysadmin1!
 ```
 
+**Create custom channels** and seed posts into a specific channel:
+
+```bash
+# Create extra channels (no posts)
+make channels NAMES="support,bugs,release-notes" PASS=Sysadmin1!
+
+# Seed posts into a specific channel only
+make seed CHANNEL=support PASS=Sysadmin1!
+
+# Create channels AND post into one of them in a single command
+make seed CHANNELS="support,bugs" CHANNEL=support PASS=Sysadmin1!
+```
+
 Or with the CLI directly for more control:
 
 ```bash
 mm-repro seed --project . --with-files --posts 30 --password Sysadmin1!
+
+# Create channels + target a specific channel for posts
+mm-repro seed --project . --channels "support,bugs" --channel support --password Sysadmin1!
 ```
 
-This fills `~town-square` and `~off-topic` with varied test content — markdown formatting, code blocks, link unfurling, threaded conversations, emoji reactions, and (with `--with-files`) PNG screenshots and log file attachments.
+This fills `~town-square` and `~off-topic` (or your chosen channel) with varied test content — markdown formatting, code blocks, link unfurling, threaded conversations, emoji reactions, and (with `--with-files`) PNG screenshots and log file attachments.
 
 ### 5 — Reproduce, then Clean Up
 
@@ -362,6 +378,19 @@ mm-repro seed --project ./generated-repro/<timestamp>/ --password Sysadmin1!
 mm-repro seed --project . --with-files --posts 30 --password Sysadmin1!
 ```
 
+**Custom channels:**
+
+```bash
+# Create channels (no posts seeded)
+make channels NAMES="support,bugs,release-notes" PASS=Sysadmin1!
+
+# Seed posts into a specific channel only
+make seed CHANNEL=support PASS=Sysadmin1!
+
+# Create channels and seed into one in a single command
+make seed CHANNELS="support,bugs" CHANNEL=support PASS=Sysadmin1!
+```
+
 **What gets created:**
 
 | Content | Details |
@@ -373,9 +402,36 @@ mm-repro seed --project . --with-files --posts 30 --password Sysadmin1!
 | 📸 **Images** (`--with-files`) | Coloured PNG screenshots attached inline |
 | 📄 **Log files** (`--with-files`) | `.log` text file attachments with preview |
 
-Posts land in both `~town-square` and `~off-topic`. Run multiple times to add more content — each run is additive, nothing is overwritten.
+Posts land in both `~town-square` and `~off-topic` by default, or in your chosen `--channel`. Run multiple times to add more content — each run is additive, nothing is overwritten.
 
 > **First run?** If Mattermost's setup wizard hasn't been completed yet, open `http://localhost:8065` first and create your admin account. Then run `mm-repro seed` — it will connect and log in with the credentials you provide.
+
+## 👥 LDAP Test Users
+
+If your repro was generated with LDAP enabled (detected automatically from the support package, or via `--with-ldap`), a `ldap/users.ldif` file is created and the `openldap` container is ready to load it:
+
+```bash
+make ldap-users
+```
+
+This loads 8 test users and 4 groups into the running OpenLDAP container. Re-run safely — existing entries are silently skipped.
+
+| User | Title | Groups |
+|------|-------|--------|
+| `alice.johnson` | Developer | staff, developers |
+| `bob.smith` | Developer | staff, developers |
+| `carol.white` | Team Lead | staff, developers, management |
+| `dave.brown` | Designer | staff |
+| `eve.davis` | QA Engineer | staff, support |
+| `frank.miller` | Support Engineer | staff, support |
+| `grace.wilson` | Project Manager | staff, management |
+| `henry.moore` | System Admin | staff, management |
+
+**Password for all test users:** `Repro1234!`
+
+After loading, trigger a sync in Mattermost: **System Console → Authentication → AD/LDAP → Synchronize Now**. Users will appear and can log in with `uid@repro.local` + `Repro1234!`.
+
+Verify the directory at **http://localhost:8089** (phpLDAPadmin — bind DN: `cn=admin,dc=repro,dc=local`, password: `ldap_admin_local_repro_only`).
 
 ---
 

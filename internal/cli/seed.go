@@ -20,6 +20,8 @@ var (
 	seedPassword   string
 	seedPostCount  int
 	seedWithFiles  bool
+	seedChannels   []string
+	seedChannel    string
 )
 
 var seedCmd = &cobra.Command{
@@ -64,12 +66,14 @@ Examples:
 		}
 
 		opts := seeder.Options{
-			SiteURL:   url,
-			Username:  seedUsername,
-			Password:  password,
-			PostCount: seedPostCount,
-			WithFiles: seedWithFiles,
-			Verbose:   verboseFlag,
+			SiteURL:     url,
+			Username:    seedUsername,
+			Password:    password,
+			PostCount:   seedPostCount,
+			WithFiles:   seedWithFiles,
+			Verbose:     verboseFlag,
+			Channels:    seedChannels,
+			PostChannel: seedChannel,
 		}
 
 		printBanner()
@@ -88,8 +92,15 @@ Examples:
 		fmt.Println()
 		printSuccess("Seeding complete!")
 		fmt.Printf("\n  Open %s and explore:\n", url)
-		fmt.Println("  • ~town-square  — posts, code blocks, tables, threads")
-		fmt.Println("  • ~off-topic    — long messages, links, reactions, pins")
+		if seedChannel != "" {
+			fmt.Printf("  • ~%s  — all seeded posts\n", seedChannel)
+		} else {
+			fmt.Println("  • ~town-square  — posts, code blocks, tables, threads")
+			fmt.Println("  • ~off-topic    — long messages, links, reactions, pins")
+		}
+		for _, ch := range seedChannels {
+			fmt.Printf("  • ~%s  — newly created channel\n", ch)
+		}
 		if seedWithFiles {
 			fmt.Println("  • File previews — images and log file attachments")
 		}
@@ -106,6 +117,8 @@ func init() {
 	seedCmd.Flags().StringVar(&seedPassword, "password", "", "Mattermost admin password (prompted if omitted)")
 	seedCmd.Flags().IntVar(&seedPostCount, "posts", 20, "Number of posts to create (max ~40 for varied content)")
 	seedCmd.Flags().BoolVar(&seedWithFiles, "with-files", false, "Attach test PNG images and log files to posts")
+	seedCmd.Flags().StringSliceVar(&seedChannels, "channels", nil, `Comma-separated channel names to create, e.g. --channels "support,bugs,release-notes"`)
+	seedCmd.Flags().StringVar(&seedChannel, "channel", "", "Seed posts only into this channel (must exist or be listed in --channels)")
 }
 
 // readSiteURLFromEnv reads MM_SITE_URL from the .env file in the project directory.
