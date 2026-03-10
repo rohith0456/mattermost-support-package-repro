@@ -1,0 +1,41 @@
+version: 2
+
+# ============================================================
+# GitGuardian false-positive suppression
+#
+# Every credential in this repository is an INTENTIONAL local
+# debugging default.  This tool (mm-repro) reproduces Mattermost
+# environments on a developer's laptop — it is not production
+# software and stores no real secrets.
+#
+# Convention used throughout the codebase:
+#   - Generated .env passwords end with  _local_repro_only
+#   - The default sysadmin account uses  Sysadmin1!  (MM demo default)
+#
+# None of these values are real credentials.
+# ============================================================
+
+matches-ignore:
+  - name: "Sysadmin local demo password (intentional, not a real credential)"
+    match: "Sysadmin1!"
+
+  - name: "Local repro database password (suffixed _local_repro_only)"
+    match: "mmuser_password_local_repro_only"
+
+  - name: "Local repro root DB password"
+    match: "root_password_local_repro_only"
+
+  - name: "Local repro LDAP admin password"
+    match: "ldap_admin_local_repro_only"
+
+  - name: "Local repro LDAP bind/readonly password"
+    match: "readonly_local_repro_only"
+
+  - name: "Local repro Keycloak admin password"
+    match: "keycloak_admin_local_repro_only"
+
+  - name: "Local repro MinIO root password"
+    match: "minio_password_local_repro_only"
+
+  - name: "Local repro Grafana admin password"
+    match: "grafana_admin_local_repro_only"

@@ -90,9 +90,9 @@ func (g *Generator) generateEnv() (string, error) {
 	sb.WriteString("# Run 'make admin' after 'make run' to create this account.\n")
 	sb.WriteString("# Email/password login always works regardless of LDAP/SAML.\n")
 	sb.WriteString("# ============================================================\n")
-	sb.WriteString("MM_ADMIN_USERNAME=sysadmin\n")
+	sb.WriteString("MM_ADMIN_USERNAME=sysadmin\n")          // gitguardian:ignore
 	sb.WriteString("MM_ADMIN_EMAIL=sysadmin@repro.local\n")
-	sb.WriteString("MM_ADMIN_PASSWORD=Sysadmin1!\n")
+	sb.WriteString("MM_ADMIN_PASSWORD=Sysadmin1!\n") // gitguardian:ignore
 	sb.WriteString("\n")
 
 	sb.WriteString("# ============================================================\n")
