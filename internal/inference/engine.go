@@ -227,7 +227,17 @@ func (e *Engine) inferAuth(plan *models.ReproPlan, sp *models.SupportPackage) {
 }
 
 func (e *Engine) inferFileStorage(plan *models.ReproPlan, sp *models.SupportPackage) {
-	if e.flags.WithMinIO || sp.FileStorage.Backend == "s3" || sp.FileStorage.Backend == "azure" {
+	// Multi-node HA requires shared file storage — auto-enable MinIO even if the
+	// original used local storage, since local storage cannot be shared across nodes.
+	needsSharedStorage := plan.Topology == "multi-node" && plan.NodeCount > 1
+	if needsSharedStorage && sp.FileStorage.Backend == "local" {
+		plan.Approximations = append(plan.Approximations, models.Approximation{
+			Component:   "file-storage",
+			Description: "MinIO auto-enabled for multi-node: shared file storage is required for HA (original used local storage)",
+			Reason:      "Local filesystem storage cannot be shared across multiple Mattermost nodes",
+		})
+	}
+	if e.flags.WithMinIO || sp.FileStorage.Backend == "s3" || sp.FileStorage.Backend == "azure" || needsSharedStorage {
 		plan.Services.FileStorage = models.FileStorageServicePlan{
 			UseMinIO:    true,
 			Image:       "minio/minio",

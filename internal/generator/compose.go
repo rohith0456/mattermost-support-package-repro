@@ -62,7 +62,7 @@ func (g *Generator) generateCompose() (string, error) {
 			port := 8065 + i
 			sb.WriteString(mattermostService(name, image, port, siteURL, p))
 		}
-		sb.WriteString(nginxService())
+		sb.WriteString(nginxService(p.NodeCount))
 	} else {
 		sb.WriteString(mattermostService("mattermost", image, 8065, siteURL, p))
 	}
@@ -83,7 +83,7 @@ func (g *Generator) generateCompose() (string, error) {
 	}
 
 	// Networks and volumes
-	sb.WriteString(networksAndVolumes())
+	sb.WriteString(networksAndVolumes(p))
 
 	return g.writeFile("docker-compose.yml", sb.String())
 }
@@ -355,8 +355,12 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
 `, name, image, siteURL, listenPort, extra.String(), port, listenPort, name, name, name, name, deps.String())
 }
 
-func nginxService() string {
-	return `
+func nginxService(nodeCount int) string {
+	var deps strings.Builder
+	for i := 1; i <= nodeCount; i++ {
+		deps.WriteString(fmt.Sprintf("      - mattermost-%d\n", i))
+	}
+	return fmt.Sprintf(`
   nginx:
     image: nginx:alpine
     restart: unless-stopped
@@ -366,12 +370,10 @@ func nginxService() string {
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/mattermost.conf:ro
     depends_on:
-      - mattermost-1
-      - mattermost-2
-    networks:
+%s    networks:
       - mm-repro
 
-`
+`, deps.String())
 }
 
 func rtcdService(port int) string {
@@ -429,8 +431,18 @@ func grafanaService(port int) string {
 `, port)
 }
 
-func networksAndVolumes() string {
-	return `
+func networksAndVolumes(p *models.ReproPlan) string {
+	var mmVolumes strings.Builder
+	if p.Topology == "multi-node" && p.NodeCount > 1 {
+		for i := 1; i <= p.NodeCount; i++ {
+			name := fmt.Sprintf("mattermost-%d", i)
+			mmVolumes.WriteString(fmt.Sprintf("  %s_logs:\n  %s_config:\n  %s_plugins:\n  %s_client_plugins:\n", name, name, name, name))
+		}
+	} else {
+		mmVolumes.WriteString("  mattermost_data:\n  mattermost_logs:\n  mattermost_config:\n  mattermost_plugins:\n  mattermost_client_plugins:\n")
+	}
+
+	return fmt.Sprintf(`
 networks:
   mm-repro:
     driver: bridge
@@ -443,12 +455,7 @@ volumes:
   ldap_config:
   keycloak_data:
   minio_data:
-  mattermost_data:
-  mattermost_logs:
-  mattermost_config:
-  mattermost_plugins:
-  mattermost_client_plugins:
-  prometheus_data:
+%s  prometheus_data:
   grafana_data:
-`
+`, mmVolumes.String())
 }
