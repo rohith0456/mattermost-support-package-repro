@@ -85,15 +85,15 @@ func extractVersionFromConfig(config map[string]interface{}) string {
 }
 
 func extractVersionFromDiagnostics(diag map[string]interface{}) string {
+	// Only use explicit server version fields. The generic "version" / "Version"
+	// keys are intentionally excluded — in metadata.yaml "version" is the format
+	// schema integer (e.g. 1), and in support_packet.json it can be a legacy
+	// config schema string (e.g. "2.4.0"). Neither represents the MM server version.
 	paths := [][]string{
-		// diagnostics.yaml format: server.version
-		{"server", "version"},
-		// other formats
-		{"server_version"},
+		{"server_version"},    // metadata.yaml: server_version: 10.11.4
+		{"server", "version"}, // diagnostics.yaml nested: server.version
 		{"ServerVersion"},
-		{"version"},
 		{"mattermost_version"},
-		{"Version"},
 	}
 	for _, path := range paths {
 		if v := getNestedString(diag, path...); v != "" {

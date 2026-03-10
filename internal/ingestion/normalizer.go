@@ -74,12 +74,22 @@ func (n *Normalizer) Normalize(pkg *PackageInfo) *NormalizedPackage {
 	}
 	// YAML diagnostics (modern support packet format: diagnostics.yaml)
 	if len(np.Diagnostics) == 0 {
-		for _, name := range []string{"diagnostics.yaml", "diagnostic.yaml", "metadata.yaml"} {
+		for _, name := range []string{"diagnostics.yaml", "diagnostic.yaml"} {
 			if path := pkg.FindFile(name); path != "" {
 				if data, err := readYAML(path); err == nil {
 					np.Diagnostics = data
 					break
 				}
+			}
+		}
+	}
+	// Always merge metadata.yaml on top — it contains authoritative fields like
+	// server_version that are reliable even when support_packet.json was already
+	// loaded. Merge overwrites any conflicting keys so server_version wins.
+	if path := pkg.FindFile("metadata.yaml"); path != "" {
+		if data, err := readYAML(path); err == nil {
+			for k, v := range data {
+				np.Diagnostics[k] = v
 			}
 		}
 	}
