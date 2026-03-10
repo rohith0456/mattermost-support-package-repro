@@ -80,6 +80,7 @@ make reset   # nuke everything and start fresh
 
 Running `mm-repro init` produces a complete project directory:
 
+**Single-node / standard:**
 ```
 generated-repro/<timestamp>/
 ├── docker-compose.yml     ← all services wired up
@@ -89,6 +90,26 @@ generated-repro/<timestamp>/
 ├── REDACTION_REPORT.md    ← every credential that was detected and replaced
 ├── PLUGIN_REPORT.md       ← plugins found and their install status
 └── repro-plan.json        ← full machine-readable plan
+```
+
+**Multi-node (HA) — extras added automatically:**
+```
+generated-repro/<timestamp>/
+├── docker-compose.yml     ← mattermost-1/2/3 + nginx + minio
+├── nginx/nginx.conf       ← load balancer config (auto-generated)
+├── config/prometheus.yml  ← scrape config for all nodes (if Grafana enabled)
+└── ...same files as above
+```
+
+**Kubernetes mode — instead of Compose:**
+```
+generated-repro/<timestamp>/
+└── kubernetes/
+    ├── 00-namespace.yaml
+    ├── 01-postgres.yaml / 01-mysql.yaml
+    ├── 02-mailhog.yaml
+    ├── 03-mattermost.yaml
+    └── kustomization.yaml
 ```
 
 No manual YAML editing. No hunting for the right image tag. No credential leaks.
@@ -138,6 +159,7 @@ When `--with-ldap` is included, all users are pre-loaded in OpenLDAP too.
 | Service | URL | Credentials |
 |---------|-----|-------------|
 | **Mattermost** | http://localhost:8065 | Users above |
+| **nginx** (multi-node load balancer) | http://localhost:8065 | — routes to all nodes |
 | **MailHog** (email capture) | http://localhost:8025 | No login |
 | **MinIO** (S3 storage) | http://localhost:9001 | `minioadmin` / `minio_local_repro_only` |
 | **Keycloak** (SAML/OIDC) | http://localhost:8080 | `admin` / `keycloak_admin_local_repro_only` |
@@ -165,6 +187,36 @@ The ngrok container starts automatically with `make run`. For a stable URL acros
 NGROK_AUTHTOKEN=your_token_here
 ```
 Get one free at [dashboard.ngrok.com](https://dashboard.ngrok.com/get-started/your-authtoken).
+
+---
+
+## 🖥️ Customer on a HA Cluster? Covered.
+
+If the support package came from a **multi-node (High Availability) deployment**, mm-repro auto-detects this and spins up multiple Mattermost containers behind an nginx load balancer — no extra flags needed:
+
+```bash
+mm-repro init --support-package ./customer.zip
+# → Topology: multi-node (3 nodes detected)
+# → nginx load balancer + MinIO (shared file storage) auto-enabled
+
+cd generated-repro/<timestamp>/
+make run
+open http://localhost:8065   # nginx routes to any of the nodes
+```
+
+**What gets auto-configured for you:**
+- 🔁 Multiple `mattermost-1`, `mattermost-2`, `mattermost-3` containers (capped at 3 for local resources)
+- ⚖️ **nginx** load balancer in front, same `http://localhost:8065` URL
+- 📦 **MinIO** automatically enabled — shared file storage is required for HA (local filesystem can't be shared across nodes)
+
+Or force it explicitly:
+```bash
+mm-repro init --support-package ./customer.zip --force-multi-node
+# Force single-node even when cluster was detected:
+mm-repro init --support-package ./customer.zip --force-single-node
+```
+
+> Note: if the original cluster had more than 3 nodes, it's capped at 3. The `REPRO_SUMMARY.md` will note the approximation.
 
 ---
 
