@@ -47,6 +47,7 @@ type ServicePlan struct {
 	Calls        CallsServicePlan      `json:"calls"`
 	Proxy        ProxyServicePlan      `json:"proxy"`
 	Observability ObservabilityServicePlan `json:"observability"`
+	Tunnel        TunnelServicePlan        `json:"tunnel"`
 }
 
 // MattermostServicePlan describes the core Mattermost service.
@@ -122,6 +123,12 @@ type ObservabilityServicePlan struct {
 	GrafanaPort       int    `json:"grafana_port,omitempty"`
 }
 
+// TunnelServicePlan describes ngrok tunnel configuration for mobile / remote access.
+type TunnelServicePlan struct {
+	NgrokEnabled bool `json:"ngrok_enabled"`
+	NgrokAPIPort int  `json:"ngrok_api_port,omitempty"` // local ngrok dashboard/API (default 4040)
+}
+
 // PluginRepro describes how a plugin will be handled in the repro.
 type PluginRepro struct {
 	ID          string `json:"id"`
@@ -165,6 +172,7 @@ type ReproFlags struct {
 	WithRTCD          bool   `json:"with_rtcd"`
 	WithGrafana       bool   `json:"with_grafana"`
 	RedactStrict      bool   `json:"redact_strict"`
-	WithKubernetes    bool   `json:"with_kubernetes"`
-	ForceDockerCompose bool  `json:"force_docker_compose"`
+	WithKubernetes     bool `json:"with_kubernetes"`
+	ForceDockerCompose bool `json:"force_docker_compose"`
+	WithNgrok          bool `json:"with_ngrok"`
 }

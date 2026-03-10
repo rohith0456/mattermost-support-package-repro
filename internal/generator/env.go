@@ -92,6 +92,17 @@ func (g *Generator) generateEnv() (string, error) {
 	sb.WriteString("MM_SMTP_PORT=1025\n")
 	sb.WriteString("\n")
 
+	if p.Services.Tunnel.NgrokEnabled {
+		sb.WriteString("# ============================================================\n")
+		sb.WriteString("# NGROK TUNNEL (mobile / remote access)\n")
+		sb.WriteString("# ============================================================\n")
+		sb.WriteString("# Set your free ngrok auth token to remove the 1-connection limit.\n")
+		sb.WriteString("# Get a free token: https://dashboard.ngrok.com/get-started/your-authtoken\n")
+		sb.WriteString("# Leave blank for anonymous mode (limited to 1 simultaneous tunnel).\n")
+		sb.WriteString("NGROK_AUTHTOKEN=\n")
+		sb.WriteString("\n")
+	}
+
 	sb.WriteString("# ============================================================\n")
 	sb.WriteString("# REPRO METADATA\n")
 	sb.WriteString("# ============================================================\n")
@@ -150,7 +161,23 @@ func (g *Generator) generateReproSummary() (string, error) {
 	if p.Services.Observability.GrafanaEnabled {
 		sb.WriteString(fmt.Sprintf("| Grafana | Enabled | %d | Metrics dashboards |\n", p.Services.Observability.GrafanaPort))
 	}
+	if p.Services.Tunnel.NgrokEnabled {
+		sb.WriteString(fmt.Sprintf("| ngrok tunnel | Enabled | %d (dashboard) | Mobile/remote access — run `make ngrok-url` |\n", p.Services.Tunnel.NgrokAPIPort))
+	}
 	sb.WriteString("\n")
+
+	if p.Services.Tunnel.NgrokEnabled {
+		sb.WriteString("## Mobile / Remote Access (ngrok)\n\n")
+		sb.WriteString("ngrok creates a public HTTPS URL for your local Mattermost instance.\n\n")
+		sb.WriteString("```bash\n")
+		sb.WriteString("# Get the public ngrok URL\n")
+		sb.WriteString("make ngrok-url\n\n")
+		sb.WriteString("# Or open the ngrok dashboard\n")
+		sb.WriteString(fmt.Sprintf("open http://localhost:%d\n", p.Services.Tunnel.NgrokAPIPort))
+		sb.WriteString("```\n\n")
+		sb.WriteString("> **Note:** Set `NGROK_AUTHTOKEN` in `.env` to remove the single-connection limit.\n")
+		sb.WriteString("> Free token: https://dashboard.ngrok.com/get-started/your-authtoken\n\n")
+	}
 
 	sb.WriteString("## Quick Start\n\n")
 	sb.WriteString("```bash\n")
@@ -286,12 +313,32 @@ func (g *Generator) generateReadme() (string, error) {
 	sb.WriteString("| `make stop` | Stop all services |\n")
 	sb.WriteString("| `make reset` | Stop and remove all data |\n")
 	sb.WriteString("| `make logs` | Follow all service logs |\n")
-	sb.WriteString("| `make ps` | Show service status |\n\n")
+	sb.WriteString("| `make ps` | Show service status |\n")
+	if p.Services.Tunnel.NgrokEnabled {
+		sb.WriteString("| `make ngrok-url` | Print the current public ngrok URL |\n")
+		sb.WriteString("| `make mobile` | Alias for `make ngrok-url` |\n")
+	}
+	sb.WriteString("\n")
+
+	if p.Services.Tunnel.NgrokEnabled {
+		sb.WriteString("## Mobile / Remote Access\n\n")
+		sb.WriteString("ngrok is included and will create a public HTTPS URL for Mattermost.\n\n")
+		sb.WriteString("1. Start the environment: `make run`\n")
+		sb.WriteString("2. Get the public URL: `make ngrok-url`\n")
+		sb.WriteString("3. Open the URL on your phone — no local network required\n\n")
+		sb.WriteString("> Optionally set `NGROK_AUTHTOKEN` in `.env` to get a stable URL and remove\n")
+		sb.WriteString("> the simultaneous connection limit. Free token: https://dashboard.ngrok.com\n\n")
+	}
 
 	sb.WriteString("## Security\n\n")
 	sb.WriteString("- Credentials in `.env` are local-only and NOT from the customer\n")
 	sb.WriteString("- MailHog captures all outbound email — nothing is sent to real recipients\n")
-	sb.WriteString("- Do not expose this environment on a public network\n")
+	if p.Services.Tunnel.NgrokEnabled {
+		sb.WriteString("- ngrok makes Mattermost publicly accessible — share the URL carefully\n")
+		sb.WriteString("- Stop ngrok (or `make stop`) when done to remove the public tunnel\n")
+	} else {
+		sb.WriteString("- Do not expose this environment on a public network\n")
+	}
 	sb.WriteString("- Delete this directory when finished debugging\n")
 
 	return g.writeFile("README.md", sb.String())

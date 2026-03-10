@@ -301,6 +301,64 @@ See [docs/kubernetes.md](docs/kubernetes.md) for full details.
 
 ---
 
+## Mobile Access with ngrok
+
+`--with-ngrok` adds a public HTTPS tunnel to your local Mattermost instance so you can test it from a phone, tablet, or any device outside your local network — no port forwarding or VPN required.
+
+### How it works
+
+- **Docker Compose mode** — an `ngrok/ngrok` container is added to the Compose stack. It tunnels automatically when `make run` starts.
+- **Kubernetes mode** — a `make ngrok` target runs the ngrok CLI against `localhost:30065`.
+
+### Quick start
+
+```bash
+# Generate with ngrok enabled
+mm-repro init --support-package ./customer.zip --with-ngrok
+
+cd generated-repro/<timestamp>/
+
+# Start everything (including ngrok)
+make run
+
+# Print the public URL — share with your phone
+make ngrok-url
+# → https://abc123.ngrok.io
+
+# Or open on your phone directly:
+make mobile   # alias for ngrok-url
+```
+
+### Ngrok dashboard
+
+The ngrok web dashboard runs at `http://localhost:4040` and shows all active tunnels, request/response inspection, and replay controls.
+
+### Optional: get a stable URL with an auth token
+
+Without a token, ngrok uses anonymous mode (random URL each restart, 1 simultaneous connection).
+For a persistent subdomain and no connection limit, add your free token to `.env`:
+
+```bash
+# .env  (generated in your repro project)
+NGROK_AUTHTOKEN=your_token_here
+```
+
+Get a free token at **https://dashboard.ngrok.com/get-started/your-authtoken** (free account, no credit card).
+
+### Works with all optional services
+
+ngrok tunnels through to Mattermost only. Other services (MailHog, Keycloak, MinIO, etc.) remain local.
+
+| Mode | URL |
+|------|-----|
+| Single-node Docker Compose | `https://<random>.ngrok.io` → `localhost:8065` |
+| Multi-node Docker Compose (nginx) | `https://<random>.ngrok.io` → `localhost:80` |
+| Kubernetes (kind) | Run `make ngrok` → `localhost:30065` |
+
+> **Security note:** ngrok creates a public internet URL. Anyone with the link can reach your local Mattermost. Stop it with `make stop` when you're done.
+
+---
+
 ## Why It Exists
 
 Setting up a local environment to reproduce a Mattermost issue is slow, manual, and easy to get wrong. `mm-repro` automates that entirely — point it at a support package ZIP and get a running local environment in minutes, with no manual config and no risk of leaking real credentials.
@@ -446,6 +504,13 @@ mm-repro init --support-package ./customer.zip --with-kubernetes
 
 # Kubernetes + LDAP
 mm-repro init --support-package ./customer.zip --with-kubernetes --with-ldap
+
+# Mobile access via ngrok
+mm-repro init --support-package ./customer.zip --with-ngrok
+
+# Full stack + mobile
+mm-repro init --support-package ./customer.zip \
+  --with-ldap --with-opensearch --with-minio --with-ngrok
 ```
 
 ---
@@ -470,6 +535,7 @@ Flags:
   --with-grafana             Include Prometheus + Grafana
   --with-kubernetes          Generate Kubernetes manifests (kind) instead of Docker Compose
   --force-docker-compose     Force Docker Compose even when Kubernetes is auto-detected
+  --with-ngrok               Add ngrok tunnel for mobile/remote access
   --redact-strict            Strict redaction (also redacts server addresses, emails)
 ```
 

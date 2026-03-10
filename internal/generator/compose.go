@@ -82,6 +82,17 @@ func (g *Generator) generateCompose() (string, error) {
 		sb.WriteString(grafanaService(p.Services.Observability.GrafanaPort))
 	}
 
+	// ngrok tunnel (mobile / remote access)
+	if p.Services.Tunnel.NgrokEnabled {
+		var tunnelTarget string
+		if p.Topology == "multi-node" && p.NodeCount > 1 {
+			tunnelTarget = "nginx:80"
+		} else {
+			tunnelTarget = fmt.Sprintf("mattermost:%d", p.Services.Mattermost.ExposedPort)
+		}
+		sb.WriteString(ngrokService(tunnelTarget, p.Services.Tunnel.NgrokAPIPort))
+	}
+
 	// Networks and volumes
 	sb.WriteString(networksAndVolumes(p))
 
@@ -429,6 +440,22 @@ func grafanaService(port int) string {
       - mm-repro
 
 `, port)
+}
+
+func ngrokService(target string, apiPort int) string {
+	return fmt.Sprintf(`
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    command: http %s --log=stdout
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    ports:
+      - "%d:4040"
+    networks:
+      - mm-repro
+
+`, target, apiPort)
 }
 
 func networksAndVolumes(p *models.ReproPlan) string {

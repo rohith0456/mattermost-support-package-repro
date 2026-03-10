@@ -74,6 +74,20 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Optional: ngrok (for --with-ngrok)
+	fmt.Println("\nChecking optional tools for mobile/remote access:")
+	if _, err := exec.LookPath("ngrok"); err == nil {
+		if ver, e := runCommand("ngrok", "version"); e == nil {
+			printSuccess(fmt.Sprintf("%s", strings.TrimSpace(ver)))
+		} else {
+			printSuccess("ngrok CLI is available")
+		}
+	} else {
+		printInfo("[optional] ngrok CLI not found — needed only for Kubernetes --with-ngrok")
+		printInfo("           Install: https://ngrok.com/download")
+		printInfo("           (Docker Compose --with-ngrok uses the ngrok container instead)")
+	}
+
 	// Optional: kubectl + kind (for --with-kubernetes)
 	fmt.Println("\nChecking optional Kubernetes tools (required only for --with-kubernetes):")
 	if _, err := exec.LookPath("kubectl"); err == nil {

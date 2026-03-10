@@ -167,6 +167,23 @@ func (g *Generator) generatePlanJSON() (string, error) {
 }
 
 func (g *Generator) generateK8sMakefile() (string, error) {
+	ngrokTargets := ""
+	if g.plan.Services.Tunnel.NgrokEnabled {
+		ngrokTargets = `
+## ngrok: Start ngrok CLI tunnel to Mattermost (mobile/remote access)
+ngrok:
+	@which ngrok > /dev/null 2>&1 || (echo "ngrok CLI not found. Install: https://ngrok.com/download" && exit 1)
+	ngrok http localhost:30065
+
+## ngrok-url: Print the current public ngrok URL
+ngrok-url:
+	@curl -s http://localhost:4040/api/tunnels 2>/dev/null | grep -o '"public_url":"https://[^"]*"' | head -1 | cut -d'"' -f4 || echo "ngrok not running — run 'make ngrok' first"
+
+## mobile: Alias for ngrok-url
+mobile: ngrok-url
+`
+	}
+
 	content := `# Generated Kubernetes Repro Makefile
 # Run: make run   (creates kind cluster + applies manifests)
 # Stop: make stop
@@ -176,7 +193,7 @@ CLUSTER  := mm-repro
 NS       := mattermost-repro
 MANIFEST := kubernetes/
 
-.PHONY: run stop reset logs status
+.PHONY: run stop reset logs status ngrok ngrok-url mobile
 
 ## run: Create kind cluster (if needed) and apply all manifests
 run:
@@ -204,7 +221,7 @@ logs:
 ## status: Show pod status
 status:
 	kubectl -n $(NS) get pods
-`
+` + ngrokTargets
 	return g.writeFile("Makefile", content)
 }
 
@@ -276,6 +293,18 @@ echo "Reset complete. Run 'make run' or ./scripts/start.sh to start fresh."
 }
 
 func (g *Generator) generateMakefile() (string, error) {
+	ngrokTargets := ""
+	if g.plan.Services.Tunnel.NgrokEnabled {
+		ngrokTargets = `
+## ngrok-url: Print the current public ngrok URL (mobile/remote access)
+ngrok-url:
+	@curl -s http://localhost:4040/api/tunnels 2>/dev/null | grep -o '"public_url":"https://[^"]*"' | head -1 | cut -d'"' -f4 || echo "ngrok not ready — wait a moment and try again"
+
+## mobile: Alias for ngrok-url
+mobile: ngrok-url
+`
+	}
+
 	content := `# Generated Repro Makefile
 # Run: make run
 # Stop: make stop
@@ -285,7 +314,7 @@ COMPOSE := docker compose
 COMPOSE_FILE := docker-compose.yml
 ENV_FILE := .env
 
-.PHONY: run stop reset logs ps health
+.PHONY: run stop reset logs ps health ngrok-url mobile
 
 ## run: Start all services
 run:
@@ -312,7 +341,7 @@ ps:
 ## health: Check service health
 health:
 	$(COMPOSE) -f $(COMPOSE_FILE) --env-file $(ENV_FILE) ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}"
-`
+` + ngrokTargets
 	return g.writeFile("Makefile", content)
 }
 

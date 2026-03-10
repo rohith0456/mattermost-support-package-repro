@@ -40,6 +40,7 @@ func (e *Engine) Infer(sp *models.SupportPackage, outputDir string) *models.Repr
 	e.inferCalls(plan, sp)
 	e.inferProxy(plan, sp)
 	e.inferObservability(plan, sp)
+	e.inferTunnel(plan, sp)
 	e.inferPlugins(plan, sp)
 
 	return plan
@@ -364,5 +365,15 @@ func (e *Engine) inferPlugins(plan *models.ReproPlan, sp *models.SupportPackage)
 		}
 
 		plan.Plugins = append(plan.Plugins, repro)
+	}
+}
+
+func (e *Engine) inferTunnel(plan *models.ReproPlan, _ *models.SupportPackage) {
+	if !e.flags.WithNgrok {
+		return
+	}
+	plan.Services.Tunnel = models.TunnelServicePlan{
+		NgrokEnabled: true,
+		NgrokAPIPort: 4040,
 	}
 }

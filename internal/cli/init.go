@@ -30,8 +30,9 @@ var (
 	initWithGrafana       bool
 	initRedactStrict      bool
 	initIssueName         string
-	initWithKubernetes    bool
+	initWithKubernetes     bool
 	initForceDockerCompose bool
+	initWithNgrok          bool
 )
 
 var initCmd = &cobra.Command{
@@ -64,6 +65,7 @@ func init() {
 	initCmd.Flags().BoolVar(&initRedactStrict, "redact-strict", false, "Apply strict redaction (also redacts server addresses and emails)")
 	initCmd.Flags().BoolVar(&initWithKubernetes, "with-kubernetes", false, "Generate Kubernetes manifests (kind) instead of Docker Compose")
 	initCmd.Flags().BoolVar(&initForceDockerCompose, "force-docker-compose", false, "Force Docker Compose output even when a Kubernetes deployment is detected")
+	initCmd.Flags().BoolVar(&initWithNgrok, "with-ngrok", false, "Include ngrok tunnel for mobile/remote access (Docker Compose only)")
 
 	_ = initCmd.MarkFlagRequired("support-package")
 }
@@ -144,6 +146,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		RedactStrict:       initRedactStrict,
 		WithKubernetes:     initWithKubernetes,
 		ForceDockerCompose: initForceDockerCompose,
+		WithNgrok:          initWithNgrok,
 	}
 	engine := inference.NewEngine(flags)
 	plan := engine.Infer(sp, outputDir)
@@ -186,6 +189,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  kubectl: https://kubernetes.io/docs/tasks/tools/\n\n")
 	} else {
 		fmt.Printf("  open http://localhost:8065\n\n")
+	}
+	if plan.Services.Tunnel.NgrokEnabled {
+		fmt.Printf("Mobile/remote access (ngrok):\n")
+		fmt.Printf("  make ngrok-url           # prints the public URL after 'make run'\n")
+		fmt.Printf("  (optional) set NGROK_AUTHTOKEN in .env for a stable URL\n\n")
 	}
 	fmt.Printf("Review the reports:\n")
 	fmt.Printf("  cat %s/REPRO_SUMMARY.md\n", outputDir)
