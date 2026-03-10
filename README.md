@@ -210,7 +210,7 @@ An interactive wizard walks you through every option:
   ✓ Topology:    single-node
   ✓ Output:      Docker Compose
   ✓ Extras:      none (bare minimum)
-  ✓ MailHog:     always included — captures all outgoing emails
+  ✓ Mailpit:     always included — captures all outgoing emails
 
   Generate this environment? [Y/n]:
 ```
@@ -238,26 +238,24 @@ Mix and match whatever the environment needs.
 
 ---
 
----
-
 ## Services at a Glance
 
 Every service mm-repro can spin up, what it does, and how to reach it:
 
 | Service | What it does | URL | Credentials |
 |---------|-------------|-----|-------------|
-| **Mattermost** | The collaboration platform itself — what you're testing | http://localhost:8065 | Default users above |
+| **Mattermost** | The collaboration platform itself — what you're testing | http://localhost:8065 | `sysadmin` / `Sysadmin1!` |
 | **PostgreSQL** | Relational database that stores all Mattermost data (channels, messages, users) | internal | auto-generated |
 | **MySQL** | Alternative to PostgreSQL — used when detected in the package or forced with `--db mysql` | internal | auto-generated |
-| **MailHog** | Catches every outgoing email so nothing reaches real inboxes; view captured emails in its web UI | http://localhost:8025 | No login |
+| **Mailpit** | Catches every outgoing email so nothing reaches real inboxes — view captured emails in its web UI | http://localhost:8025 | No login |
 | **nginx** | Load balancer in front of all Mattermost nodes in HA mode — distributes traffic evenly across the cluster | http://localhost:8065 | routes to all nodes |
-| **MinIO** | Local S3-compatible object storage — Mattermost stores file attachments here instead of on disk; required for HA so all nodes share one storage backend | http://localhost:9001 | `minioadmin` / `minio_local_repro_only` |
+| **MinIO** | Local S3-compatible object storage — Mattermost stores file attachments here instead of on disk; required for HA so all nodes share one storage backend | http://localhost:9001 | `repro_minio_user` / `minio_password_local_repro_only` |
 | **OpenSearch** | Full-text search engine — faster and richer than database search; drop-in open-source replacement for Elasticsearch | http://localhost:9200 | No login |
-| **OpenLDAP** | LDAP directory server pre-loaded with stub test users for testing LDAP authentication flows | internal | auto-generated |
+| **OpenLDAP** | LDAP directory server for testing LDAP auth flows — run `make ldap-users` to load 8 test users after startup | internal | auto-generated |
 | **phpLDAPadmin** | Web UI to browse and manage the OpenLDAP directory — view users, groups, and attributes | http://localhost:8089 | `cn=admin,dc=repro,dc=local` / `ldap_admin_local_repro_only` |
 | **Keycloak** | Identity provider for testing SAML 2.0 and OIDC single-sign-on authentication | http://localhost:8080 | `admin` / `keycloak_admin_local_repro_only` |
 | **Prometheus** | Scrapes and stores performance metrics from Mattermost every 15 seconds | http://localhost:9090 | No login |
-| **Grafana** | Dashboard for visualising Prometheus metrics — API latency, DB queries, memory, active users | http://localhost:3000 | `admin` / `admin` |
+| **Grafana** | Dashboard for visualising Prometheus metrics — API latency, DB queries, memory, active users | http://localhost:3000 | `admin` / `grafana_admin_local_repro_only` |
 | **RTCD** | Real-Time Communications Daemon — handles WebRTC signalling for Mattermost Calls (video/voice) | internal | auto-generated |
 | **ngrok** | Creates a public HTTPS tunnel so you can open Mattermost on a phone or share it remotely | http://localhost:4040 (inspector) | No login |
 
@@ -389,6 +387,8 @@ Posts land in both `~town-square` and `~off-topic` by default, or in your chosen
 
 > **First run?** If Mattermost's setup wizard hasn't been completed yet, open `http://localhost:8065` first and create your admin account. Then run `mm-repro seed` — it will connect and log in with the credentials you provide.
 
+---
+
 ## 👥 LDAP Test Users
 
 If your repro was generated with LDAP enabled (detected automatically from the support package, or via `--with-ldap`), a `ldap/users.ldif` file is created and the `openldap` container is ready to load it:
@@ -423,7 +423,7 @@ Verify the directory at **http://localhost:8089** (phpLDAPadmin — bind DN: `cn
 mm-repro is built so you can't accidentally leak sensitive data:
 
 - 🔐 **Secrets are replaced** — passwords, keys, DSNs, tokens all become safe `*_local_repro_only` placeholders
-- 📧 **Email is captured** — MailHog intercepts everything, nothing reaches real inboxes
+- 📧 **Email is captured** — Mailpit intercepts everything, nothing reaches real inboxes
 - 🚫 **No outbound connections** — zero telemetry, zero calls to external infrastructure
 - 📋 **Full audit trail** — `REDACTION_REPORT.md` lists every credential that was detected and replaced
 - 🗑️ **Original ZIP untouched** — mm-repro only reads it, never modifies it
