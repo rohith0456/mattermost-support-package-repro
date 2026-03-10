@@ -21,10 +21,12 @@ mm-repro init --support-package ./support-package.zip
 It figures out the exact setup from the package and generates a ready-to-run environment — Docker Compose **or** Kubernetes, matching the version and config, with all secrets safely replaced. Then:
 
 ```bash
-cd generated-repro/<timestamp>/
+cd generated-repro/20250310-143022/   # mm-repro init prints the exact path — just copy it
 make run
 open http://localhost:8065
 ```
+
+> 💡 **The output folder is auto-named** `YYYYMMDD-HHMMSS` from when you ran `init` (e.g. `generated-repro/20250310-143022/`). `mm-repro init` prints the exact `cd` command at the end — no guessing needed. Add `--issue MM-1234` and the folder becomes `generated-repro/MM-1234-20250310-143022/`.
 
 That's it. You're reproducing.
 
@@ -60,7 +62,7 @@ mm-repro doctor
 **With a support package** (auto-detects version, DB, topology, services):
 ```bash
 mm-repro init --support-package ~/Downloads/support-package.zip
-cd generated-repro/<timestamp>/
+cd generated-repro/20250310-143022/   # use the path printed by init
 make run
 make admin   # create sysadmin account — run once after first 'make run'
 ```
@@ -68,7 +70,7 @@ make admin   # create sysadmin account — run once after first 'make run'
 **Without a support package** — interactive wizard picks your setup:
 ```bash
 mm-repro init
-cd generated-repro/<timestamp>/
+cd generated-repro/20250310-143022/   # use the path printed by init
 make run
 make admin   # create sysadmin account — run once after first 'make run'
 ```
@@ -131,7 +133,7 @@ Running `mm-repro init` produces a complete project directory:
 
 **Single-node / standard:**
 ```
-generated-repro/<timestamp>/
+generated-repro/20250310-143022/       ← folder name = YYYYMMDD-HHMMSS of when you ran init
 ├── docker-compose.yml     ← all services wired up
 ├── .env                   ← safe local-only credentials
 ├── Makefile               ← run / stop / reset / logs
@@ -143,7 +145,7 @@ generated-repro/<timestamp>/
 
 **Multi-node (HA) — extras added automatically:**
 ```
-generated-repro/<timestamp>/
+generated-repro/20250310-143022/
 ├── docker-compose.yml     ← mattermost-1/2/3 + nginx + minio
 ├── nginx/nginx.conf       ← load balancer config (auto-generated)
 ├── config/prometheus.yml  ← scrape config for all nodes (if Grafana enabled)
@@ -152,7 +154,7 @@ generated-repro/<timestamp>/
 
 **Kubernetes mode — instead of Compose:**
 ```
-generated-repro/<timestamp>/
+generated-repro/20250310-143022/
 └── kubernetes/
     ├── 00-namespace.yaml
     ├── 01-postgres.yaml / 01-mysql.yaml
@@ -269,7 +271,7 @@ Add `--with-ngrok` to get a public HTTPS URL you can open on any device:
 
 ```bash
 mm-repro init --support-package ./support-package.zip --with-ngrok
-cd generated-repro/<timestamp>/
+cd generated-repro/20250310-143022/   # use the path printed by init
 make run
 
 make ngrok-url   # → https://abc123.ngrok.io
@@ -293,7 +295,7 @@ mm-repro init --support-package ./support-package.zip
 # → Topology: multi-node (3 nodes detected)
 # → nginx load balancer + MinIO (shared file storage) auto-enabled
 
-cd generated-repro/<timestamp>/
+cd generated-repro/20250310-143022/   # use the path printed by init
 make run
 open http://localhost:8065   # nginx routes to any of the nodes
 ```
@@ -322,7 +324,7 @@ If the support package came from a Kubernetes deployment, mm-repro **auto-detect
 mm-repro init --support-package ./support-package.zip
 # → Output: kubernetes  (auto-detected from pod naming patterns)
 
-cd generated-repro/<timestamp>/
+cd generated-repro/20250310-143022/   # use the path printed by init
 make run
 open http://localhost:30065
 ```
@@ -353,7 +355,7 @@ Or with the CLI directly for more control:
 
 ```bash
 # Quick seed (20 posts, no files)
-mm-repro seed --project ./generated-repro/<timestamp>/ --password Sysadmin1!
+mm-repro seed --project ./generated-repro/20250310-143022/ --password Sysadmin1!
 
 # Full seed with file attachments
 mm-repro seed --project . --with-files --posts 30 --password Sysadmin1!
