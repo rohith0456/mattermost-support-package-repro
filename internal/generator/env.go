@@ -149,8 +149,7 @@ func (g *Generator) generateReproSummary() (string, error) {
 	sb.WriteString("|----------|-------|\n")
 	sb.WriteString("| Username | `sysadmin` |\n")
 	sb.WriteString("| Password | `Sysadmin1!` |\n\n")
-	sb.WriteString("> **Email/password login always works** — no license or LDAP needed.\n")
-	sb.WriteString("> Configure LDAP, SAML, and other services via **System Console → Authentication** after logging in.\n\n")
+	sb.WriteString("> **Email/password login always works** — no license, LDAP, or SAML required. After initial login, upload the required license to enable other features.\n\n")
 
 	sb.WriteString("## Services\n\n")
 	sb.WriteString("| Service | Status | Port | Notes |\n")
@@ -322,7 +321,7 @@ func (g *Generator) generateReadme() (string, error) {
 	sb.WriteString(fmt.Sprintf("Open http://localhost:%d and sign in:\n\n", p.Services.Mattermost.ExposedPort))
 	sb.WriteString("- **Username:** `sysadmin`\n")
 	sb.WriteString("- **Password:** `Sysadmin1!`\n\n")
-	sb.WriteString("> Email/password login always works — no license or LDAP/SAML required for first login.\n\n")
+	sb.WriteString("> Email/password login always works — no license, LDAP, or SAML required. After initial login, upload the required license to enable other features.\n\n")
 
 	if p.Services.Email.UseMailHog {
 		sb.WriteString(fmt.Sprintf("Email (Mailpit UI): http://localhost:%d\n\n", p.Services.Email.UIPort))

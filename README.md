@@ -80,8 +80,7 @@ Open `http://localhost:8065` and sign in:
 | Username | `sysadmin` |
 | Password | `Sysadmin1!` |
 
-> **Email/password login always works** — no license, LDAP, or SAML required.
-> Configure LDAP/SAML via **System Console → Authentication** after first login.
+> **Email/password login always works** — no license, LDAP, or SAML required. After initial login, upload the required license to enable other features.
 
 All emails are captured by Mailpit at `http://localhost:8025` — nothing real gets sent.
 
