@@ -303,7 +303,7 @@ func (w *wizard) printSummary(sp *models.SupportPackage, flags models.ReproFlags
 	} else {
 		fmt.Printf("  %s Extras:      %snone (bare minimum)%s\n", tick, dim, reset)
 	}
-	fmt.Printf("  %s MailHog:     always included — captures all outgoing emails\n", tick)
+	fmt.Printf("  %s Mailpit:     always included — captures all outgoing emails\n", tick)
 }
 
 // ─── version parsing ──────────────────────────────────────────────────────────

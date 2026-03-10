@@ -178,6 +178,7 @@ func ldapService() string {
 	return `
   openldap:
     image: osixia/openldap:1.5.0
+    platform: linux/amd64
     restart: unless-stopped
     environment:
       LDAP_ORGANISATION: "Mattermost Repro Org"
@@ -197,6 +198,7 @@ func ldapService() string {
 
   phpldapadmin:
     image: osixia/phpldapadmin:0.9.0
+    platform: linux/amd64
     restart: unless-stopped
     environment:
       PHPLDAPADMIN_LDAP_HOSTS: openldap
@@ -264,7 +266,7 @@ func minioService(port int) string {
 func mailhogService(smtpPort, uiPort int) string {
 	return fmt.Sprintf(`
   mailhog:
-    image: mailhog/mailhog:latest
+    image: axllent/mailpit:latest
     restart: unless-stopped
     ports:
       - "%d:1025"
@@ -404,6 +406,7 @@ func rtcdService(port int) string {
 	return fmt.Sprintf(`
   rtcd:
     image: mattermost/rtcd:latest
+    platform: linux/amd64
     restart: unless-stopped
     ports:
       - "%d:8045"

@@ -86,7 +86,17 @@ func (g *Generator) generateEnv() (string, error) {
 	}
 
 	sb.WriteString("# ============================================================\n")
-	sb.WriteString("# EMAIL SETTINGS (MailHog local stub)\n")
+	sb.WriteString("# DEFAULT ADMIN CREDENTIALS (LOCAL REPRO ONLY)\n")
+	sb.WriteString("# Run 'make admin' after 'make run' to create this account.\n")
+	sb.WriteString("# Email/password login always works regardless of LDAP/SAML.\n")
+	sb.WriteString("# ============================================================\n")
+	sb.WriteString("MM_ADMIN_USERNAME=sysadmin\n")
+	sb.WriteString("MM_ADMIN_EMAIL=sysadmin@repro.local\n")
+	sb.WriteString("MM_ADMIN_PASSWORD=Sysadmin1!\n")
+	sb.WriteString("\n")
+
+	sb.WriteString("# ============================================================\n")
+	sb.WriteString("# EMAIL SETTINGS (Mailpit local stub — captures all outgoing emails)\n")
 	sb.WriteString("# ============================================================\n")
 	sb.WriteString("MM_SMTP_SERVER=mailhog\n")
 	sb.WriteString("MM_SMTP_PORT=1025\n")
@@ -129,6 +139,19 @@ func (g *Generator) generateReproSummary() (string, error) {
 	sb.WriteString(fmt.Sprintf("- **URL**: http://localhost:%d\n", p.Services.Mattermost.ExposedPort))
 	sb.WriteString("\n")
 
+	sb.WriteString("## First Login\n\n")
+	sb.WriteString("Run this **once** after `make run` to create the admin account:\n\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString("make admin\n")
+	sb.WriteString("```\n\n")
+	sb.WriteString("Then open Mattermost and sign in with:\n\n")
+	sb.WriteString("| Field    | Value |\n")
+	sb.WriteString("|----------|-------|\n")
+	sb.WriteString("| Username | `sysadmin` |\n")
+	sb.WriteString("| Password | `Sysadmin1!` |\n\n")
+	sb.WriteString("> **Email/password login always works** — no license or LDAP needed.\n")
+	sb.WriteString("> Configure LDAP, SAML, and other services via **System Console → Authentication** after logging in.\n\n")
+
 	sb.WriteString("## Services\n\n")
 	sb.WriteString("| Service | Status | Port | Notes |\n")
 	sb.WriteString("|---------|--------|------|-------|\n")
@@ -152,7 +175,7 @@ func (g *Generator) generateReproSummary() (string, error) {
 		sb.WriteString(fmt.Sprintf("| MinIO | Enabled | %d | Approximates cloud storage |\n", p.Services.FileStorage.ExposedPort))
 	}
 	if p.Services.Email.UseMailHog {
-		sb.WriteString(fmt.Sprintf("| MailHog (SMTP) | Enabled | %d (SMTP) / %d (UI) | Captures all emails |\n",
+		sb.WriteString(fmt.Sprintf("| Mailpit (SMTP) | Enabled | %d (SMTP) / %d (UI) | Captures all emails |\n",
 			p.Services.Email.ExposedPort, p.Services.Email.UIPort))
 	}
 	if p.Services.Observability.PrometheusEnabled {
@@ -213,7 +236,7 @@ func (g *Generator) generateReproSummary() (string, error) {
 	sb.WriteString("- All credentials in .env are LOCAL REPRO ONLY — not from the customer environment\n")
 	sb.WriteString("- See REDACTION_REPORT.md for what was redacted from the support package\n")
 	sb.WriteString("- This environment MUST NOT connect to any real production systems\n")
-	sb.WriteString("- Email sending is captured by MailHog — no real emails will be sent\n")
+	sb.WriteString("- Email sending is captured by Mailpit — no real emails will be sent\n")
 
 	return g.writeFile("REPRO_SUMMARY.md", sb.String())
 }
@@ -293,12 +316,16 @@ func (g *Generator) generateReadme() (string, error) {
 
 	sb.WriteString("## Quick Start\n\n")
 	sb.WriteString("```bash\n")
-	sb.WriteString("make run\n")
+	sb.WriteString("make run    # 1. start all containers\n")
+	sb.WriteString("make admin  # 2. create sysadmin account (first time only)\n")
 	sb.WriteString("```\n\n")
-	sb.WriteString(fmt.Sprintf("Mattermost will be available at: http://localhost:%d\n\n", p.Services.Mattermost.ExposedPort))
+	sb.WriteString(fmt.Sprintf("Open http://localhost:%d and sign in:\n\n", p.Services.Mattermost.ExposedPort))
+	sb.WriteString("- **Username:** `sysadmin`\n")
+	sb.WriteString("- **Password:** `Sysadmin1!`\n\n")
+	sb.WriteString("> Email/password login always works — no license or LDAP/SAML required for first login.\n\n")
 
 	if p.Services.Email.UseMailHog {
-		sb.WriteString(fmt.Sprintf("Email (MailHog UI): http://localhost:%d\n\n", p.Services.Email.UIPort))
+		sb.WriteString(fmt.Sprintf("Email (Mailpit UI): http://localhost:%d\n\n", p.Services.Email.UIPort))
 	}
 
 	sb.WriteString("## Reports\n\n")
@@ -332,7 +359,8 @@ func (g *Generator) generateReadme() (string, error) {
 
 	sb.WriteString("## Security\n\n")
 	sb.WriteString("- Credentials in `.env` are local-only and NOT from the customer\n")
-	sb.WriteString("- MailHog captures all outbound email — nothing is sent to real recipients\n")
+	sb.WriteString("- Default admin `sysadmin` / `Sysadmin1!` — created by `make admin`, local repro only\n")
+	sb.WriteString("- Mailpit captures all outbound email — nothing is sent to real recipients\n")
 	if p.Services.Tunnel.NgrokEnabled {
 		sb.WriteString("- ngrok makes Mattermost publicly accessible — share the URL carefully\n")
 		sb.WriteString("- Stop ngrok (or `make stop`) when done to remove the public tunnel\n")

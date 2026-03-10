@@ -242,7 +242,7 @@ spec:
     spec:
       containers:
       - name: mailhog
-        image: mailhog/mailhog:latest
+        image: axllent/mailpit:latest
         ports:
         - containerPort: 1025
           name: smtp

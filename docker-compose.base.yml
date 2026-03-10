@@ -122,10 +122,10 @@ services:
       start_period: 60s
 
   # ============================================================
-  # MAILHOG — Local email capture (always enabled)
+  # MAILHOG (Mailpit) — Local email capture (always enabled)
   # ============================================================
   mailhog:
-    image: mailhog/mailhog:latest
+    image: axllent/mailpit:latest
     restart: unless-stopped
     ports:
       - "${MAILHOG_SMTP_PORT:-1025}:1025"   # SMTP
@@ -192,6 +192,7 @@ services:
   # ============================================================
   openldap:
     image: osixia/openldap:1.5.0
+    platform: linux/amd64
     restart: unless-stopped
     profiles:
       - ldap

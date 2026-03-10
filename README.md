@@ -62,30 +62,41 @@ mm-repro doctor
 mm-repro init --support-package ~/Downloads/support-package.zip
 cd generated-repro/<timestamp>/
 make run
+make admin   # create sysadmin account — run once after first 'make run'
 ```
 
 **Without a support package** — interactive wizard picks your setup:
 ```bash
 mm-repro init
-# → answers a few questions, then generates and runs
 cd generated-repro/<timestamp>/
 make run
+make admin   # create sysadmin account — run once after first 'make run'
 ```
 
-Open `http://localhost:8065` — Mattermost is running. All emails go to MailHog at `http://localhost:8025`, nothing real gets sent.
+Open `http://localhost:8065` and sign in:
+
+| Field | Value |
+|-------|-------|
+| Username | `sysadmin` |
+| Password | `Sysadmin1!` |
+
+> **Email/password login always works** — no license, LDAP, or SAML required.
+> Configure LDAP/SAML via **System Console → Authentication** after first login.
+
+All emails are captured by Mailpit at `http://localhost:8025` — nothing real gets sent.
 
 ### 4 — Seed Test Content
 
-Once Mattermost is running, populate it with posts, threads, reactions, images and file attachments in one command:
+Once Mattermost is running and you've logged in at least once, populate it with posts, threads, reactions, images and file attachments:
 
 ```bash
-make seed PASS=YourAdminPassword
+make seed PASS=Sysadmin1!
 ```
 
 Or with the CLI directly for more control:
 
 ```bash
-mm-repro seed --project . --with-files --posts 30 --password YourAdminPassword
+mm-repro seed --project . --with-files --posts 30 --password Sysadmin1!
 ```
 
 This fills `~town-square` and `~off-topic` with varied test content — markdown formatting, code blocks, link unfurling, threaded conversations, emoji reactions, and (with `--with-files`) PNG screenshots and log file attachments.
@@ -335,17 +346,21 @@ See [docs/kubernetes.md](docs/kubernetes.md) for the full Kubernetes guide.
 
 ## 🌱 Seed Test Data
 
-After the environment is running, `mm-repro seed` fills it with realistic test content so you can start testing immediately — no manual post creation needed.
+After `make run`, first create the admin account, then seed content:
+
+```bash
+make admin              # creates sysadmin / Sysadmin1! (run once)
+make seed PASS=Sysadmin1!  # seeds 20 posts, threads, reactions
+```
+
+Or with the CLI directly for more control:
 
 ```bash
 # Quick seed (20 posts, no files)
-mm-repro seed --project ./generated-repro/<timestamp>/ --password YourAdminPassword
+mm-repro seed --project ./generated-repro/<timestamp>/ --password Sysadmin1!
 
 # Full seed with file attachments
-mm-repro seed --project . --with-files --posts 30 --password YourAdminPassword
-
-# Or use the Makefile shortcut from the generated project directory
-make seed PASS=YourAdminPassword
+mm-repro seed --project . --with-files --posts 30 --password Sysadmin1!
 ```
 
 **What gets created:**
@@ -391,6 +406,7 @@ See [docs/security.md](docs/security.md) for the complete threat model.
 | `mm-repro run --project <dir>` | Start a generated environment |
 | `mm-repro stop --project <dir>` | Stop it |
 | `mm-repro reset --project <dir>` | Wipe all data and start fresh |
+| `mm-repro seed --project <dir> --posts 0 --password Sysadmin1!` | Create sysadmin account only (no posts) |
 | `mm-repro seed --project <dir>` | Seed posts, threads, reactions and files |
 
 Full `init` flags:

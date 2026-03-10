@@ -206,7 +206,7 @@ CLUSTER  := mm-repro
 NS       := mattermost-repro
 MANIFEST := kubernetes/
 
-.PHONY: run stop reset logs status ngrok ngrok-url mobile
+.PHONY: run stop reset logs status admin ngrok ngrok-url mobile
 
 ## run: Create kind cluster (if needed) and apply all manifests
 run:
@@ -216,7 +216,9 @@ run:
 	kubectl -n $(NS) wait --for=condition=ready pod -l app=mattermost --timeout=180s || true
 	@echo ""
 	@echo "Environment started. Open: http://localhost:30065"
-	@echo "MailHog UI:             http://localhost:30025"
+	@echo "Mailpit (email) UI:     http://localhost:30025"
+	@echo ""
+	@echo "Next: run 'make admin' to create the sysadmin account (first time only)"
 
 ## stop: Delete manifests but keep cluster and volumes
 stop:
@@ -235,8 +237,21 @@ logs:
 status:
 	kubectl -n $(NS) get pods
 
-## seed: Seed test posts, images and reactions (run after 'make run' once MM is up)
-## Usage: make seed PASS=YourAdminPassword
+## admin: Create the default sysadmin account (run once after 'make run')
+## Creates sysadmin / Sysadmin1! via REST API — safe to re-run.
+admin:
+	@which mm-repro > /dev/null 2>&1 || (echo "mm-repro not found. Install: go install github.com/rohith0456/mattermost-support-package-repro/cmd/mm-repro@latest" && exit 1)
+	mm-repro seed --url http://localhost:30065 --posts 0 --password Sysadmin1!
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Login at http://localhost:30065"
+	@echo "  Username : sysadmin"
+	@echo "  Password : Sysadmin1!"
+	@echo "  (Email/password login — works without LDAP/SAML)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+## seed: Seed test posts, images and reactions (run after 'make admin')
+## Usage: make seed PASS=Sysadmin1!
 seed:
 	@which mm-repro > /dev/null 2>&1 || (echo "mm-repro not found. Install: go install github.com/rohith0456/mattermost-support-package-repro/cmd/mm-repro@latest" && exit 1)
 	mm-repro seed --url http://localhost:30065 --project . $(if $(PASS),--password $(PASS),)
@@ -267,7 +282,7 @@ kubectl -n "${NS}" wait --for=condition=ready pod -l app=mattermost --timeout=18
 echo ""
 echo "Environment started."
 echo "  Mattermost: http://localhost:30065"
-echo "  MailHog UI: http://localhost:30025"
+echo "  Mailpit (email) UI: http://localhost:30025"
 echo ""
 echo "See REPRO_SUMMARY.md for full connection details."
 `
@@ -333,12 +348,16 @@ COMPOSE := docker compose
 COMPOSE_FILE := docker-compose.yml
 ENV_FILE := .env
 
-.PHONY: run stop reset logs ps health ngrok-url mobile
+.PHONY: run stop reset logs ps health admin seed ngrok-url mobile
 
 ## run: Start all services
 run:
 	$(COMPOSE) -f $(COMPOSE_FILE) --env-file $(ENV_FILE) up -d
-	@echo "Environment started. Check REPRO_SUMMARY.md for connection details."
+	@echo ""
+	@echo "Environment started!"
+	@echo "  Next: run 'make admin' to create the sysadmin account (first time only)"
+	@echo "  Then open http://localhost:8065"
+	@echo "  See REPRO_SUMMARY.md for all connection details."
 
 ## stop: Stop all services
 stop:
@@ -361,9 +380,23 @@ ps:
 health:
 	$(COMPOSE) -f $(COMPOSE_FILE) --env-file $(ENV_FILE) ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}"
 
-## seed: Seed test posts, images and reactions (run after 'make run' once MM is up)
-## Usage: make seed PASS=YourAdminPassword
-## Or:   mm-repro seed --project . --with-files --password YourAdminPassword
+## admin: Create the default sysadmin account (run once after 'make run')
+## This creates sysadmin / Sysadmin1! via the Mattermost REST API.
+## Safe to re-run — silently skips if the account already exists.
+admin:
+	@which mm-repro > /dev/null 2>&1 || (echo "mm-repro not found. Install: go install github.com/rohith0456/mattermost-support-package-repro/cmd/mm-repro@latest" && exit 1)
+	mm-repro seed --project . --posts 0 --password Sysadmin1!
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Login at http://localhost:8065"
+	@echo "  Username : sysadmin"
+	@echo "  Password : Sysadmin1!"
+	@echo "  (Email/password login — works without LDAP/SAML)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+## seed: Seed test posts, images and reactions (run after 'make admin')
+## Usage: make seed PASS=Sysadmin1!
+## Or:   mm-repro seed --project . --with-files --password Sysadmin1!
 seed:
 	@which mm-repro > /dev/null 2>&1 || (echo "mm-repro not found. Install: go install github.com/rohith0456/mattermost-support-package-repro/cmd/mm-repro@latest" && exit 1)
 	mm-repro seed --project . $(if $(PASS),--password $(PASS),)

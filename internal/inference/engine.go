@@ -294,14 +294,14 @@ func (e *Engine) inferFileStorage(plan *models.ReproPlan, sp *models.SupportPack
 func (e *Engine) inferEmail(plan *models.ReproPlan, sp *models.SupportPackage) {
 	plan.Services.Email = models.EmailServicePlan{
 		UseMailHog:  true,
-		Image:       "mailhog/mailhog",
+		Image:       "axllent/mailpit",
 		ExposedPort: 1025,
 		UIPort:      8025,
 	}
 	if sp.Integrations.HasSMTP {
 		plan.Stubbed = append(plan.Stubbed, models.StubbedItem{
 			Component: "smtp",
-			Reason:    "Customer SMTP server replaced with local MailHog to prevent accidental email sending",
+			Reason:    "Customer SMTP server replaced with local Mailpit to prevent accidental email sending",
 			StubType:  "local-mock",
 		})
 	}
