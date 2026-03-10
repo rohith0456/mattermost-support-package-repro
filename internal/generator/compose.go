@@ -276,8 +276,13 @@ func mailhogService(smtpPort, uiPort int) string {
 }
 
 func mattermostService(name, image string, port int, siteURL string, p *models.ReproPlan) string {
+	// Use the correct DB service name in depends_on
+	dbServiceName := "postgres"
+	if p.Services.Database.Type == "mysql" {
+		dbServiceName = "mysql"
+	}
 	var deps strings.Builder
-	deps.WriteString("    depends_on:\n      postgres:\n        condition: service_healthy\n")
+	deps.WriteString(fmt.Sprintf("    depends_on:\n      %s:\n        condition: service_healthy\n", dbServiceName))
 	if p.Services.FileStorage.UseMinIO {
 		deps.WriteString("      minio:\n        condition: service_healthy\n")
 	}
@@ -337,13 +342,21 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
 
 	listenPort := fmt.Sprintf("%d", port)
 
+	// Build correct DB driver and datasource defaults based on the plan's DB type
+	dbDriver := "postgres"
+	dbDatasource := "postgres://mmuser:mmuser_password@postgres:5432/mattermost?sslmode=disable"
+	if p.Services.Database.Type == "mysql" {
+		dbDriver = "mysql"
+		dbDatasource = "mmuser:mmuser_password@tcp(mysql:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s"
+	}
+
 	return fmt.Sprintf(`
   %s:
     image: %s
     restart: unless-stopped
     environment:
-      MM_SQLSETTINGS_DRIVERNAME: ${MM_DB_DRIVER:-postgres}
-      MM_SQLSETTINGS_DATASOURCE: ${MM_DATASOURCE:-postgres://mmuser:mmuser_password@postgres:5432/mattermost?sslmode=disable}
+      MM_SQLSETTINGS_DRIVERNAME: ${MM_DB_DRIVER:-%s}
+      MM_SQLSETTINGS_DATASOURCE: ${MM_DATASOURCE:-%s}
       MM_SERVICESETTINGS_SITEURL: %s
       MM_SERVICESETTINGS_LISTENADDRESS: ":%s"
       MM_EMAILSETTINGS_SMTPSERVER: mailhog
@@ -363,7 +376,7 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
 %s    healthcheck:
       disable: true
 
-`, name, image, siteURL, listenPort, extra.String(), port, listenPort, name, name, name, name, deps.String())
+`, name, image, dbDriver, dbDatasource, siteURL, listenPort, extra.String(), port, listenPort, name, name, name, name, deps.String())
 }
 
 func nginxService(nodeCount int) string {

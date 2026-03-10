@@ -92,7 +92,12 @@ func (e *Engine) inferTopology(plan *models.ReproPlan, sp *models.SupportPackage
 		return
 	}
 
-	if e.flags.ForceMultiNode || (sp.Topology.IsCluster && !e.flags.ForceSingleNode) {
+	// Require actual NodeCount > 1 from cluster_info before going multi-node.
+	// IsCluster=true alone (from ClusterSettings.Enable in config) is insufficient —
+	// the support package may have been generated from a single active node with
+	// cluster mode turned on in config but no peers running.
+	clusterConfirmed := sp.Topology.IsCluster && sp.Topology.NodeCount > 1
+	if e.flags.ForceMultiNode || (clusterConfirmed && !e.flags.ForceSingleNode) {
 		plan.Topology = "multi-node"
 		nodeCount := sp.Topology.NodeCount
 		if nodeCount < 2 {

@@ -22,14 +22,17 @@ func ParseVersion(np *ingestion.NormalizedPackage) models.VersionInfo {
 		Edition: "unknown",
 	}
 
-	// Try config first
-	if raw := extractVersionFromConfig(np.Config); raw != "" {
+	// Try diagnostics/metadata first — metadata.yaml has an explicit server_version
+	// field that is more reliable than config.json's generic "version" field
+	// (which is a config schema version, not the MM server version).
+	if raw := extractVersionFromDiagnostics(np.Diagnostics); raw != "" {
 		info.Raw = raw
 	}
 
-	// Try diagnostics
+	// Try config (only ServiceSettings.Version — skip generic "version" fields
+	// that may hold config schema versions rather than the MM server version)
 	if info.Raw == "" {
-		if raw := extractVersionFromDiagnostics(np.Diagnostics); raw != "" {
+		if raw := extractVersionFromConfig(np.Config); raw != "" {
 			info.Raw = raw
 		}
 	}
@@ -67,10 +70,11 @@ func ParseVersion(np *ingestion.NormalizedPackage) models.VersionInfo {
 }
 
 func extractVersionFromConfig(config map[string]interface{}) string {
+	// Only use ServiceSettings.Version — the top-level "version" / "Version" fields
+	// in config.json are config schema versions (e.g. "2.4.0"), NOT the MM server
+	// version, so they must not be used here.
 	paths := [][]string{
 		{"ServiceSettings", "Version"},
-		{"version"},
-		{"Version"},
 	}
 	for _, path := range paths {
 		if v := getNestedString(config, path...); v != "" {
