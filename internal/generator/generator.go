@@ -348,16 +348,23 @@ COMPOSE := docker compose
 COMPOSE_FILE := docker-compose.yml
 ENV_FILE := .env
 
-.PHONY: run stop reset logs ps health admin seed ngrok-url mobile
+.PHONY: run pull stop reset logs ps health admin seed ngrok-url mobile
 
-## run: Start all services
+## run: Pull images (ensures platform-correct versions) then start all services
+## On Apple Silicon this prevents "no matching manifest" / platform cache errors.
 run:
+	@echo "Pulling images (ensures platform-correct versions on all architectures)..."
+	@$(COMPOSE) -f $(COMPOSE_FILE) --env-file $(ENV_FILE) pull --quiet --ignore-pull-failures 2>/dev/null || true
 	$(COMPOSE) -f $(COMPOSE_FILE) --env-file $(ENV_FILE) up -d
 	@echo ""
 	@echo "Environment started!"
 	@echo "  Next: run 'make admin' to create the sysadmin account (first time only)"
 	@echo "  Then open http://localhost:8065"
 	@echo "  See REPRO_SUMMARY.md for all connection details."
+
+## pull: Pull/refresh all Docker images (also run this if you see platform errors)
+pull:
+	$(COMPOSE) -f $(COMPOSE_FILE) --env-file $(ENV_FILE) pull
 
 ## stop: Stop all services
 stop:
@@ -415,6 +422,9 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 echo "Starting Mattermost repro environment..."
 echo "Project: $PROJECT_DIR"
 echo ""
+
+echo "Pulling images (ensures platform-correct versions on Apple Silicon and x86)..."
+docker compose -f "$PROJECT_DIR/docker-compose.yml" --env-file "$PROJECT_DIR/.env" pull --quiet --ignore-pull-failures 2>/dev/null || true
 
 docker compose -f "$PROJECT_DIR/docker-compose.yml" --env-file "$PROJECT_DIR/.env" up -d
 

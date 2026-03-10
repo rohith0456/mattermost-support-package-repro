@@ -41,8 +41,6 @@ volumes:
     driver: local
   ldap_data:
     driver: local
-  ldap_config:
-    driver: local
   keycloak_data:
     driver: local
   prometheus_data:
@@ -189,26 +187,29 @@ services:
 
   # ============================================================
   # OPENLDAP — Optional: enable with --with-ldap
+  # bitnami/openldap has native ARM64 support (no platform override needed).
+  # user: root is required to bind to privileged port 389 (< 1024).
   # ============================================================
   openldap:
-    image: osixia/openldap:1.5.0
-    platform: linux/amd64
+    image: bitnami/openldap:latest
+    user: root
     restart: unless-stopped
     profiles:
       - ldap
     environment:
-      LDAP_ORGANISATION: "Mattermost Repro Org"
-      LDAP_DOMAIN: ${LDAP_DOMAIN:-repro.local}
+      LDAP_ROOT: dc=repro,dc=local
+      LDAP_ADMIN_USERNAME: admin
       LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-ldap_admin_local_repro_only}
-      LDAP_READONLY_USER: "true"
+      LDAP_PORT_NUMBER: "389"
+      LDAP_LDAPS_PORT_NUMBER: "636"
+      LDAP_READONLY_USER: "yes"
       LDAP_READONLY_USER_USERNAME: ${LDAP_BIND_USER:-readonly}
       LDAP_READONLY_USER_PASSWORD: ${LDAP_BIND_PASSWORD:-readonly_local_repro_only}
     ports:
       - "${LDAP_PORT:-389}:389"
       - "${LDAPS_PORT:-636}:636"
     volumes:
-      - ldap_data:/var/lib/ldap
-      - ldap_config:/etc/ldap/slapd.d
+      - ldap_data:/bitnami/openldap
     networks:
       - mm-repro
 

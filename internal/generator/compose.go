@@ -177,22 +177,27 @@ func opensearchService(port int) string {
 func ldapService() string {
 	return `
   openldap:
-    image: osixia/openldap:1.5.0
-    platform: linux/amd64
+    image: bitnami/openldap:latest
+    # bitnami/openldap has native ARM64 support — no platform override needed.
+    # user: root is required to bind to privileged port 389 (< 1024).
+    # bitnami explicitly supports this for local/dev usage.
+    # See: https://hub.docker.com/r/bitnami/openldap
+    user: root
     restart: unless-stopped
     environment:
-      LDAP_ORGANISATION: "Mattermost Repro Org"
-      LDAP_DOMAIN: ${LDAP_DOMAIN:-repro.local}
+      LDAP_ROOT: dc=repro,dc=local
+      LDAP_ADMIN_USERNAME: admin
       LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-repro_admin_password}
-      LDAP_READONLY_USER: "true"
+      LDAP_PORT_NUMBER: "389"
+      LDAP_LDAPS_PORT_NUMBER: "636"
+      LDAP_READONLY_USER: "yes"
       LDAP_READONLY_USER_USERNAME: ${LDAP_BIND_USER:-readonly}
       LDAP_READONLY_USER_PASSWORD: ${LDAP_BIND_PASSWORD:-readonly_password}
     ports:
       - "389:389"
       - "636:636"
     volumes:
-      - ldap_data:/var/lib/ldap
-      - ldap_config:/etc/ldap/slapd.d
+      - ldap_data:/bitnami/openldap
     networks:
       - mm-repro
 
@@ -495,7 +500,6 @@ volumes:
   mysql_data:
   opensearch_data:
   ldap_data:
-  ldap_config:
   keycloak_data:
   minio_data:
 %s  prometheus_data:
