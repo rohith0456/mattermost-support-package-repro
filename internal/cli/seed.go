@@ -77,11 +77,18 @@ Examples:
 		}
 
 		printBanner()
-		printInfo(fmt.Sprintf("Seeding test content into %s", url))
-		if seedWithFiles {
-			printInfo("File attachments: enabled (images + log files)")
+
+		// Admin-only mode: just create the account, no post seeding
+		adminOnly := seedPostCount == 0 && len(seedChannels) == 0 && seedChannel == ""
+		if adminOnly {
+			printInfo(fmt.Sprintf("Creating admin account at %s", url))
+		} else {
+			printInfo(fmt.Sprintf("Seeding test content into %s", url))
+			if seedWithFiles {
+				printInfo("File attachments: enabled (images + log files)")
+			}
+			fmt.Printf("  Posts to create: %d\n", seedPostCount)
 		}
-		fmt.Printf("  Posts to create: %d\n", seedPostCount)
 		fmt.Println()
 
 		s := seeder.New(url)
@@ -90,22 +97,26 @@ Examples:
 		}
 
 		fmt.Println()
-		printSuccess("Seeding complete!")
-		fmt.Printf("\n  Open %s and explore:\n", url)
-		if seedChannel != "" {
-			fmt.Printf("  • ~%s  — all seeded posts\n", seedChannel)
+		if adminOnly {
+			printSuccess("Admin account ready!")
 		} else {
-			fmt.Println("  • ~town-square  — posts, code blocks, tables, threads")
-			fmt.Println("  • ~off-topic    — long messages, links, reactions, pins")
+			printSuccess("Seeding complete!")
+			fmt.Printf("\n  Open %s and explore:\n", url)
+			if seedChannel != "" {
+				fmt.Printf("  • ~%s  — all seeded posts\n", seedChannel)
+			} else {
+				fmt.Println("  • ~town-square  — posts, code blocks, tables, threads")
+				fmt.Println("  • ~off-topic    — long messages, links, reactions, pins")
+			}
+			for _, ch := range seedChannels {
+				fmt.Printf("  • ~%s  — newly created channel\n", ch)
+			}
+			if seedWithFiles {
+				fmt.Println("  • File previews — images and log file attachments")
+			}
+			fmt.Println()
+			fmt.Println("  Tip: run again with --with-files to add image and log attachments.")
 		}
-		for _, ch := range seedChannels {
-			fmt.Printf("  • ~%s  — newly created channel\n", ch)
-		}
-		if seedWithFiles {
-			fmt.Println("  • File previews — images and log file attachments")
-		}
-		fmt.Println()
-		fmt.Println("  Tip: run again with --with-files to add image and log attachments.")
 		return nil
 	},
 }
