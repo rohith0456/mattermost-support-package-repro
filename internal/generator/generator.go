@@ -269,7 +269,7 @@ azure-ad:
 `
 	}
 
-	k8sPhonyExtra := " upload-license"
+	k8sPhonyExtra := " upload-license restart-mattermost"
 	if g.plan.Services.Auth.LDAPEnabled {
 		k8sPhonyExtra += " ldap-users ldap-sync"
 	}
@@ -370,6 +370,14 @@ upload-license:
 	@kubectl rollout restart deployment/mattermost -n $(NS)
 	@kubectl rollout status deployment/mattermost -n $(NS) --timeout=120s
 	@echo "✓ Mattermost restarted. LDAP, SAML, and all Enterprise features are now active."
+
+## restart-mattermost: Restart Mattermost to apply Enterprise settings after manual license upload
+## Run this if you uploaded a license via the System Console (browser) instead of 'make upload-license'
+restart-mattermost:
+	@echo "Restarting Mattermost to apply Enterprise settings from env vars..."
+	@kubectl rollout restart deployment/mattermost -n $(NS)
+	@kubectl rollout status deployment/mattermost -n $(NS) --timeout=120s
+	@echo "✓ Done. LDAP, SAML, and all Enterprise features are now active."
 ` + ngrokTargets
 	return g.writeFile("Makefile", content)
 }
@@ -518,7 +526,7 @@ azure-ad:
 `
 	}
 
-	phonyExtra := " upload-license"
+	phonyExtra := " upload-license restart-mattermost"
 	if g.plan.Services.Auth.LDAPEnabled {
 		phonyExtra += " ldap-users ldap-sync"
 	}
@@ -629,6 +637,14 @@ upload-license:
 	@$(COMPOSE) -f $(COMPOSE_FILE) --env-file $(ENV_FILE) restart mattermost
 	@echo "✓ Mattermost restarted. LDAP, SAML, and all Enterprise features are now active."
 	@echo "  Wait ~15 seconds for Mattermost to finish starting, then reload http://localhost:8065"
+
+## restart-mattermost: Restart Mattermost to apply Enterprise settings after manual license upload
+## Run this if you uploaded a license via the System Console (browser) instead of 'make upload-license'
+restart-mattermost:
+	@echo "Restarting Mattermost to apply Enterprise settings from env vars..."
+	@$(COMPOSE) -f $(COMPOSE_FILE) --env-file $(ENV_FILE) restart mattermost
+	@echo "✓ Done. Wait ~15 seconds, then reload http://localhost:8065"
+	@echo "  LDAP, SAML, and all Enterprise features are now active."
 ` + ngrokTargets
 	return g.writeFile("Makefile", content)
 }
