@@ -377,6 +377,18 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
       MM_SAMLSETTINGS_LASTNAMEATTRIBUTE: family_name
 `)
 	}
+	// Metrics / Prometheus (required for Prometheus scraping to work — activates immediately)
+	if p.Services.Observability.PrometheusEnabled {
+		extra.WriteString(`      MM_METRICSSETTINGS_ENABLE: "true"
+      MM_METRICSSETTINGS_LISTENADDRESS: ":8067"
+`)
+	}
+	// Guest accounts (Enterprise — pre-configured, activates on license upload + restart)
+	if p.Services.Auth.GuestAccountsEnabled {
+		extra.WriteString(`      MM_GUESTSETTINGS_ENABLE: "true"
+      MM_GUESTSETTINGS_ALLOWEMAILDOMAINS: ""
+`)
+	}
 	// License pre-loaded (when --license flag was provided at init time)
 	if p.LicenseProvided {
 		extra.WriteString(`      MM_SERVICESETTINGS_LICENSEFILELOCATION: /mattermost/licenses/mattermost.mattermost-license

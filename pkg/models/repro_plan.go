@@ -91,6 +91,9 @@ type AuthServicePlan struct {
 	// SAMLEnabled means SAML env vars are configured in docker-compose.
 	// SAML requires a Mattermost Enterprise license to function; OIDC does not.
 	SAMLEnabled bool `json:"saml_enabled,omitempty"`
+	// GuestAccountsEnabled means MM_GUESTSETTINGS_ENABLE is set.
+	// Detected from the support package or always true for enterprise edition.
+	GuestAccountsEnabled bool `json:"guest_accounts_enabled,omitempty"`
 }
 
 // FileStorageServicePlan describes the file storage service.

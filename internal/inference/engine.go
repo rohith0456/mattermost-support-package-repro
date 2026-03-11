@@ -3,6 +3,7 @@ package inference
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rohith0456/mattermost-support-package-repro/pkg/models"
@@ -257,6 +258,11 @@ func (e *Engine) inferAuth(plan *models.ReproPlan, sp *models.SupportPackage) {
 				Reason:      "Azure AD (Entra ID) not accessible locally; Keycloak used as local identity provider",
 			})
 		}
+	}
+
+	// Guest accounts: detected from support package OR always enabled for enterprise edition
+	if sp.Auth.GuestAccounts || strings.Contains(strings.ToLower(plan.MattermostImage), "enterprise") {
+		authPlan.GuestAccountsEnabled = true
 	}
 
 	plan.LicenseProvided = e.flags.LicenseFile != ""
