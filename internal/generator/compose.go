@@ -289,6 +289,9 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
 	}
 	var deps strings.Builder
 	deps.WriteString(fmt.Sprintf("    depends_on:\n      %s:\n        condition: service_healthy\n", dbServiceName))
+	if p.Services.Search.Enabled {
+		deps.WriteString("      opensearch:\n        condition: service_healthy\n")
+	}
 	if p.Services.FileStorage.UseMinIO {
 		deps.WriteString("      minio:\n        condition: service_healthy\n")
 	}
@@ -312,6 +315,17 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
 	if p.Topology == "multi-node" && p.NodeCount > 1 {
 		extra.WriteString(`      MM_CLUSTERSETTINGS_ENABLE: "true"
       MM_CLUSTERSETTINGS_CLUSTERNAME: repro-cluster
+`)
+	}
+	// OpenSearch (requires Enterprise license — pre-configured, activates on license upload + restart)
+	if p.Services.Search.Enabled {
+		extra.WriteString(`      MM_ELASTICSEARCHSETTINGS_CONNECTIONURL: http://opensearch:9200
+      MM_ELASTICSEARCHSETTINGS_ENABLEINDEXING: "true"
+      MM_ELASTICSEARCHSETTINGS_ENABLESEARCHING: "true"
+      MM_ELASTICSEARCHSETTINGS_ENABLEAUTOCOMPLETE: "true"
+      MM_ELASTICSEARCHSETTINGS_SKIPTLSVERIFICATION: "true"
+      MM_ELASTICSEARCHSETTINGS_USERNAME: ""
+      MM_ELASTICSEARCHSETTINGS_PASSWORD: ""
 `)
 	}
 	// LDAP
