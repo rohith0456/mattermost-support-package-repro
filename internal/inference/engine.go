@@ -64,10 +64,16 @@ func (e *Engine) inferVersion(plan *models.ReproPlan, sp *models.SupportPackage)
 		})
 	}
 
-	// Choose Docker image based on edition
-	image := "mattermost/mattermost-team-edition"
-	if sp.Version.Edition == "enterprise" || sp.Version.Edition == "cloud" {
-		image = "mattermost/mattermost-enterprise-edition"
+	// Always use enterprise edition — team edition cannot accept a license upload,
+	// which makes the license workflow impossible. Enterprise edition works with
+	// or without a license (team-only features are simply not unlocked until one is uploaded).
+	image := "mattermost/mattermost-enterprise-edition"
+	if sp.Version.Edition == "team" {
+		plan.Approximations = append(plan.Approximations, models.Approximation{
+			Component:   "mattermost-edition",
+			Description: "Upgraded to Enterprise edition image to support license upload",
+			Reason:      "Team edition cannot accept a license; Enterprise edition runs identically without one",
+		})
 	}
 
 	plan.MattermostImage = image
