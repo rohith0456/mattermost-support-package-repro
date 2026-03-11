@@ -349,9 +349,11 @@ channels:
 	mm-repro seed --url http://localhost:30065 --project . --posts 0 --channels "$(NAMES)" $(if $(PASS),--password $(PASS),)
 	@echo "Channels created."
 ` + k8sLdapTargets + k8sKeycloakTargets + `
-## upload-license: Upload a Mattermost license after startup to unlock Enterprise features
+## upload-license: Upload a Mattermost license and restart to activate Enterprise features
 ## Usage: make upload-license LICENSE=./your.mattermost-license PASS=Sysadmin1!
-## After upload: SAML and LDAP sync activate automatically (already pre-configured).
+## Restart is required: Mattermost skips licensed-feature env vars at startup when no
+## license is present. A restart re-applies all env vars (LDAP, SAML, etc.) with the
+## license now active — no manual System Console configuration needed.
 upload-license:
 	@test -n "$(LICENSE)" || (echo "Usage: make upload-license LICENSE=./path/to.mattermost-license PASS=Sysadmin1!" && exit 1)
 	@test -f "$(LICENSE)" || (echo "Error: File not found: $(LICENSE)" && exit 1)
@@ -362,9 +364,12 @@ upload-license:
 	   | grep -i '^token:' | awk '{print $$2}' | tr -d '\r'); \
 	 test -n "$$TOKEN" || (echo "✗ Auth failed — run 'make admin' first." && exit 1); \
 	 curl -sf -X POST http://localhost:30065/api/v4/license \
-	     -H "Authorization: Bearer $$TOKEN" -F "license=@$(LICENSE)" > /dev/null && \
-	 echo "✓ License uploaded. Enterprise features (SAML, LDAP sync) are now active." || \
-	 echo "✗ Upload may have failed — check Mattermost logs with 'make logs'."
+	     -H "Authorization: Bearer $$TOKEN" -F "license=@$(LICENSE)" > /dev/null || \
+	 (echo "✗ Upload failed — check Mattermost logs with 'make logs'." && exit 1)
+	@echo "✓ License uploaded. Restarting Mattermost to apply Enterprise settings..."
+	@kubectl rollout restart deployment/mattermost -n $(NS)
+	@kubectl rollout status deployment/mattermost -n $(NS) --timeout=120s
+	@echo "✓ Mattermost restarted. LDAP, SAML, and all Enterprise features are now active."
 ` + ngrokTargets
 	return g.writeFile("Makefile", content)
 }
@@ -603,9 +608,11 @@ channels:
 	mm-repro seed --project . --posts 0 --channels "$(NAMES)" $(if $(PASS),--password $(PASS),)
 	@echo "Channels created."
 ` + ldapTargets + keycloakTargets + `
-## upload-license: Upload a Mattermost license after startup to unlock Enterprise features
+## upload-license: Upload a Mattermost license and restart to activate Enterprise features
 ## Usage: make upload-license LICENSE=./your.mattermost-license PASS=Sysadmin1!
-## After upload: SAML and LDAP sync activate automatically (already pre-configured).
+## Restart is required: Mattermost skips licensed-feature env vars at startup when no
+## license is present. A restart re-applies all env vars (LDAP, SAML, etc.) with the
+## license now active — no manual System Console configuration needed.
 upload-license:
 	@test -n "$(LICENSE)" || (echo "Usage: make upload-license LICENSE=./path/to.mattermost-license PASS=Sysadmin1!" && exit 1)
 	@test -f "$(LICENSE)" || (echo "Error: File not found: $(LICENSE)" && exit 1)
@@ -616,9 +623,12 @@ upload-license:
 	   | grep -i '^token:' | awk '{print $$2}' | tr -d '\r'); \
 	 test -n "$$TOKEN" || (echo "✗ Auth failed — run 'make admin' first." && exit 1); \
 	 curl -sf -X POST http://localhost:8065/api/v4/license \
-	     -H "Authorization: Bearer $$TOKEN" -F "license=@$(LICENSE)" > /dev/null && \
-	 echo "✓ License uploaded. Enterprise features (SAML, LDAP sync) are now active." || \
-	 echo "✗ Upload may have failed — check Mattermost logs with 'make logs'."
+	     -H "Authorization: Bearer $$TOKEN" -F "license=@$(LICENSE)" > /dev/null || \
+	 (echo "✗ Upload failed — check Mattermost logs with 'make logs'." && exit 1)
+	@echo "✓ License uploaded. Restarting Mattermost to apply Enterprise settings..."
+	@$(COMPOSE) -f $(COMPOSE_FILE) --env-file $(ENV_FILE) restart mattermost
+	@echo "✓ Mattermost restarted. LDAP, SAML, and all Enterprise features are now active."
+	@echo "  Wait ~15 seconds for Mattermost to finish starting, then reload http://localhost:8065"
 ` + ngrokTargets
 	return g.writeFile("Makefile", content)
 }
