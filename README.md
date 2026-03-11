@@ -467,29 +467,43 @@ Both are fully pre-configured — no System Console steps needed. SAML activates
 
 ## 📋 Enterprise License
 
-Mattermost Enterprise features (LDAP sync, SAML SSO) require a license. mm-repro gives you two ways to handle this:
+Mattermost Enterprise features (LDAP sync, SAML SSO) require a license.
 
-### Option A — Pre-load at init (recommended)
+> **How it works:** All LDAP/SAML settings are already pre-configured in the generated environment via env vars. The license doesn't change any configuration — it just unlocks the features. **But Mattermost must be restarted after the license is loaded** so it re-reads those env vars with the license now present. mm-repro handles the restart for you automatically.
 
-Provide the license file when you generate the environment. Mattermost starts with it already loaded — Enterprise features are active from the very first `make run`:
+### Option A — Pre-load at init (simplest)
+
+Pass the license file when you generate the environment. Mattermost starts with the license already loaded — everything works from the very first `make run`, no extra steps:
 
 ```bash
 mm-repro init --support-package ./support-package.zip --license ./your.mattermost-license
 cd generated-repro/20250310-143022/
-make run && make admin
-# SAML and LDAP sync work immediately — no license upload step needed
+make run
+make admin
+# ✓ LDAP and SAML work immediately — done
 ```
 
-### Option B — Upload after startup
-
-No license at init? Upload it with a single command after `make run && make admin`:
+### Option B — Upload via command line after startup
 
 ```bash
+make run
+make admin
 make upload-license LICENSE=./your.mattermost-license PASS=Sysadmin1!
-# ✓ License uploaded. Enterprise features (SAML, LDAP sync) now active.
+# ✓ Uploads the license, then automatically restarts Mattermost
+# ✓ LDAP and SAML active — no System Console steps needed
 ```
 
-That's it — all SAML, LDAP, and other Enterprise settings are **already pre-configured** in the generated environment. Uploading the license is all it takes to activate them. No System Console reconfiguration needed.
+### Option C — Upload via System Console (browser)
+
+If you uploaded the license manually through **System Console → About → Edition and License → Upload License**, run this one extra command afterward:
+
+```bash
+make restart-mattermost
+# ✓ Restarts Mattermost so the env var settings take effect
+# ✓ LDAP and SAML active — no System Console steps needed
+```
+
+> **Why the restart?** Mattermost skips applying licensed-feature settings at startup when no license is present. Once the license is loaded (by any method), a restart tells Mattermost to re-read all its settings with the license now active.
 
 ---
 
@@ -561,7 +575,9 @@ See [docs/architecture.md](docs/architecture.md) for details.
 
 **Docker not running** → Start Docker Desktop and wait for it to fully initialize.
 
-**Port 8065 in use** → Edit `MM_PORT=8066` in the generated `.env`, then `make run` again.
+**Port already in use** → Edit the relevant port variable in the generated `.env` (e.g. `MM_PORT=8066`, `PROMETHEUS_PORT=9091`, `MAILPIT_PORT=8026`), then `make run` again.
+
+**LDAP / SAML not working after license upload** → Run `make restart-mattermost`. Mattermost must restart after a license is loaded to apply Enterprise settings. If you used `make upload-license`, the restart is automatic. If you uploaded via the System Console (browser), you need to run `make restart-mattermost` manually.
 
 **Keycloak slow to start** → Normal — it takes 2–3 minutes. Watch with `make logs`.
 
