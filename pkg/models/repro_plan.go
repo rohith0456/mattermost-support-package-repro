@@ -34,6 +34,11 @@ type ReproPlan struct {
 
 	// Flags passed to the generator
 	Flags ReproFlags `json:"flags"`
+
+	// LicenseProvided is true when a license file was given at init time.
+	// The generator will include a license bind-mount so Enterprise features
+	// (LDAP sync, SAML) are active from the very first 'make run'.
+	LicenseProvided bool `json:"license_provided,omitempty"`
 }
 
 // ServicePlan lists which services will be included in the compose output.
@@ -79,10 +84,13 @@ type SearchServicePlan struct {
 
 // AuthServicePlan describes auth backend services.
 type AuthServicePlan struct {
-	LDAPEnabled      bool   `json:"ldap_enabled"`
-	LDAPImage        string `json:"ldap_image,omitempty"`
-	KeycloakEnabled  bool   `json:"keycloak_enabled"`
-	KeycloakImage    string `json:"keycloak_image,omitempty"`
+	LDAPEnabled     bool   `json:"ldap_enabled"`
+	LDAPImage       string `json:"ldap_image,omitempty"`
+	KeycloakEnabled bool   `json:"keycloak_enabled"`
+	KeycloakImage   string `json:"keycloak_image,omitempty"`
+	// SAMLEnabled means SAML env vars are configured in docker-compose.
+	// SAML requires a Mattermost Enterprise license to function; OIDC does not.
+	SAMLEnabled bool `json:"saml_enabled,omitempty"`
 }
 
 // FileStorageServicePlan describes the file storage service.
@@ -162,17 +170,21 @@ type StubbedItem struct {
 
 // ReproFlags holds the CLI flags that influenced the plan.
 type ReproFlags struct {
-	ForceDB           string `json:"force_db,omitempty"`
-	ForceSingleNode   bool   `json:"force_single_node"`
-	ForceMultiNode    bool   `json:"force_multi_node"`
-	WithOpenSearch    bool   `json:"with_opensearch"`
-	WithLDAP          bool   `json:"with_ldap"`
-	WithSAML          bool   `json:"with_saml"`
-	WithMinIO         bool   `json:"with_minio"`
-	WithRTCD          bool   `json:"with_rtcd"`
-	WithGrafana       bool   `json:"with_grafana"`
-	RedactStrict      bool   `json:"redact_strict"`
-	WithKubernetes     bool `json:"with_kubernetes"`
-	ForceDockerCompose bool `json:"force_docker_compose"`
-	WithNgrok          bool `json:"with_ngrok"`
+	ForceDB            string `json:"force_db,omitempty"`
+	ForceSingleNode    bool   `json:"force_single_node"`
+	ForceMultiNode     bool   `json:"force_multi_node"`
+	WithOpenSearch     bool   `json:"with_opensearch"`
+	WithLDAP           bool   `json:"with_ldap"`
+	WithSAML           bool   `json:"with_saml"`
+	WithAzureAD        bool   `json:"with_azure_ad,omitempty"`
+	WithMinIO          bool   `json:"with_minio"`
+	WithRTCD           bool   `json:"with_rtcd"`
+	WithGrafana        bool   `json:"with_grafana"`
+	RedactStrict       bool   `json:"redact_strict"`
+	WithKubernetes     bool   `json:"with_kubernetes"`
+	ForceDockerCompose bool   `json:"force_docker_compose"`
+	WithNgrok          bool   `json:"with_ngrok"`
+	// LicenseFile is the path to a .mattermost-license file provided at init time.
+	// When set, the generator pre-loads it so Enterprise features are active from boot.
+	LicenseFile string `json:"license_file,omitempty"`
 }

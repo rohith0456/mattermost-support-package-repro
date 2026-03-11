@@ -59,10 +59,23 @@ func (g *Generator) generateEnv() (string, error) {
 
 	if p.Services.Auth.KeycloakEnabled {
 		sb.WriteString("# ============================================================\n")
-		sb.WriteString("# KEYCLOAK SETTINGS (LOCAL STUB ONLY)\n")
+		sb.WriteString("# KEYCLOAK / AZURE AD SETTINGS (LOCAL STUB ONLY)\n")
+		sb.WriteString("# OIDC (GitLab SSO): works immediately — no license needed\n")
+		sb.WriteString("# SAML:              requires Enterprise license — pre-configured, activates on upload\n")
 		sb.WriteString("# ============================================================\n")
 		sb.WriteString("KEYCLOAK_ADMIN=admin\n")
 		sb.WriteString("KEYCLOAK_ADMIN_PASSWORD=keycloak_admin_local_repro_only\n")
+		sb.WriteString("OIDC_CLIENT_ID=mattermost-client\n")
+		sb.WriteString("OIDC_CLIENT_SECRET=mattermost-secret-local-repro-only\n") // gitguardian:ignore
+		sb.WriteString("\n")
+	}
+
+	if p.LicenseProvided {
+		sb.WriteString("# ============================================================\n")
+		sb.WriteString("# MATTERMOST LICENSE\n")
+		sb.WriteString("# Pre-loaded — Enterprise features (LDAP sync, SAML) are active from first boot.\n")
+		sb.WriteString("# ============================================================\n")
+		sb.WriteString("MM_LICENSE_FILE=/mattermost/licenses/mattermost.mattermost-license\n")
 		sb.WriteString("\n")
 	}
 

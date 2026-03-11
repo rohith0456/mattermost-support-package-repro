@@ -120,6 +120,12 @@ func (g *Generator) Generate() ([]string, error) {
 				fn   func() (string, error)
 			}{"ldap/users.ldif", g.generateLDIF})
 		}
+		if g.plan.Services.Auth.KeycloakEnabled {
+			tasks = append(tasks, struct {
+				name string
+				fn   func() (string, error)
+			}{"keycloak/repro-realm.json", g.generateKeycloakRealm})
+		}
 	}
 
 	for _, task := range tasks {
@@ -218,12 +224,57 @@ ldap-users:
 	  -w "ldap_admin_local_repro_only" \
 	  -f /ldap/users.ldif 2>&1 | grep -v "already exists" || true
 	@echo "Done. User password: Repro1234!"
+
+## ldap-sync: Trigger immediate LDAP sync in Mattermost (requires Enterprise license)
+## Usage: make ldap-sync PASS=Sysadmin1!
+ldap-sync:
+	@PASS=$${PASS:-Sysadmin1!}; \
+	 TOKEN=$$(curl -sf -X POST http://localhost:30065/api/v4/users/login \
+	     -H "Content-Type: application/json" \
+	     -d "{\"login_id\":\"sysadmin\",\"password\":\"$$PASS\"}" -D - 2>/dev/null \
+	   | grep -i '^token:' | awk '{print $$2}' | tr -d '\r'); \
+	 test -n "$$TOKEN" || (echo "✗ Auth failed — run 'make admin' first." && exit 1); \
+	 curl -sf -X POST http://localhost:30065/api/v4/ldap/sync \
+	     -H "Authorization: Bearer $$TOKEN" > /dev/null && \
+	 echo "✓ LDAP sync triggered. Users will appear in Mattermost within ~60 seconds." || \
+	 echo "✗ Sync failed — check that Enterprise license is uploaded ('make upload-license')."
 `
 	}
 
-	k8sPhonyExtra := ""
+	k8sKeycloakTargets := ""
+	if g.plan.Services.Auth.KeycloakEnabled {
+		k8sKeycloakTargets = `
+## azure-ad: Show Azure AD / Keycloak authentication status and test credentials
+azure-ad:
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Azure AD local simulation via Keycloak"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "  Keycloak console : http://localhost:30080 (if port-forwarded)"
+	@echo "  Realm            : repro"
+	@echo "  Admin login      : admin / keycloak_admin_local_repro_only"
+	@echo ""
+	@echo "  OIDC (Entra ID simulation) — works NOW, no license needed:"
+	@echo "  → Click 'Sign in with GitLab' on the Mattermost login page"
+	@echo ""
+	@echo "  SAML — requires Enterprise license:"
+	@echo "  → run: make upload-license LICENSE=./your.mattermost-license PASS=Sysadmin1!"
+	@echo "  → SAML is pre-configured — no System Console steps needed after upload"
+	@echo ""
+	@echo "  Test users (password: Repro1234!):"
+	@echo "    alice.johnson   bob.smith    carol.white  dave.brown"
+	@echo "    eve.davis       frank.miller grace.wilson henry.moore"
+	@echo ""
+`
+	}
+
+	k8sPhonyExtra := " upload-license"
 	if g.plan.Services.Auth.LDAPEnabled {
-		k8sPhonyExtra += " ldap-users"
+		k8sPhonyExtra += " ldap-users ldap-sync"
+	}
+	if g.plan.Services.Auth.KeycloakEnabled {
+		k8sPhonyExtra += " azure-ad"
 	}
 
 	content := `# Generated Kubernetes Repro Makefile
@@ -297,7 +348,24 @@ channels:
 	@test -n "$(NAMES)" || (echo "Usage: make channels NAMES=\"chan1,chan2\" PASS=Sysadmin1!" && exit 1)
 	mm-repro seed --url http://localhost:30065 --project . --posts 0 --channels "$(NAMES)" $(if $(PASS),--password $(PASS),)
 	@echo "Channels created."
-` + k8sLdapTargets + ngrokTargets
+` + k8sLdapTargets + k8sKeycloakTargets + `
+## upload-license: Upload a Mattermost license after startup to unlock Enterprise features
+## Usage: make upload-license LICENSE=./your.mattermost-license PASS=Sysadmin1!
+## After upload: SAML and LDAP sync activate automatically (already pre-configured).
+upload-license:
+	@test -n "$(LICENSE)" || (echo "Usage: make upload-license LICENSE=./path/to.mattermost-license PASS=Sysadmin1!" && exit 1)
+	@test -f "$(LICENSE)" || (echo "Error: File not found: $(LICENSE)" && exit 1)
+	@PASS=$${PASS:-Sysadmin1!}; \
+	 TOKEN=$$(curl -sf -X POST http://localhost:30065/api/v4/users/login \
+	     -H "Content-Type: application/json" \
+	     -d "{\"login_id\":\"sysadmin\",\"password\":\"$$PASS\"}" -D - 2>/dev/null \
+	   | grep -i '^token:' | awk '{print $$2}' | tr -d '\r'); \
+	 test -n "$$TOKEN" || (echo "✗ Auth failed — run 'make admin' first." && exit 1); \
+	 curl -sf -X POST http://localhost:30065/api/v4/license \
+	     -H "Authorization: Bearer $$TOKEN" -F "license=@$(LICENSE)" > /dev/null && \
+	 echo "✓ License uploaded. Enterprise features (SAML, LDAP sync) are now active." || \
+	 echo "✗ Upload may have failed — check Mattermost logs with 'make logs'."
+` + ngrokTargets
 	return g.writeFile("Makefile", content)
 }
 
@@ -399,12 +467,58 @@ ldap-users:
 	@echo "  Bind DN  : cn=admin,dc=repro,dc=local"
 	@echo "  Password : ldap_admin_local_repro_only"
 	@echo "  User pwd : Repro1234!"
+
+## ldap-sync: Trigger immediate LDAP sync in Mattermost (requires Enterprise license)
+## Usage: make ldap-sync PASS=Sysadmin1!
+ldap-sync:
+	@PASS=$${PASS:-Sysadmin1!}; \
+	 TOKEN=$$(curl -sf -X POST http://localhost:8065/api/v4/users/login \
+	     -H "Content-Type: application/json" \
+	     -d "{\"login_id\":\"sysadmin\",\"password\":\"$$PASS\"}" -D - 2>/dev/null \
+	   | grep -i '^token:' | awk '{print $$2}' | tr -d '\r'); \
+	 test -n "$$TOKEN" || (echo "✗ Auth failed — run 'make admin' first." && exit 1); \
+	 curl -sf -X POST http://localhost:8065/api/v4/ldap/sync \
+	     -H "Authorization: Bearer $$TOKEN" > /dev/null && \
+	 echo "✓ LDAP sync triggered. Users will appear in Mattermost within ~60 seconds." || \
+	 echo "✗ Sync failed — check that Enterprise license is uploaded ('make upload-license')."
 `
 	}
 
-	phonyExtra := ""
+	keycloakTargets := ""
+	if g.plan.Services.Auth.KeycloakEnabled {
+		keycloakTargets = `
+## azure-ad: Show Azure AD / Keycloak authentication status and test credentials
+azure-ad:
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Azure AD local simulation via Keycloak"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "  Keycloak console : http://localhost:8080"
+	@echo "  Realm            : repro"
+	@echo "  Admin login      : admin / keycloak_admin_local_repro_only"
+	@echo ""
+	@echo "  OIDC (Entra ID simulation) — works NOW, no license needed:"
+	@echo "  → Click 'Sign in with GitLab' on the Mattermost login page"
+	@echo ""
+	@echo "  SAML — requires Enterprise license:"
+	@echo "  → run: make upload-license LICENSE=./your.mattermost-license PASS=Sysadmin1!"
+	@echo "  → SAML is pre-configured — no System Console steps needed after upload"
+	@echo "  → Click 'Sign in with SAML' after license is active"
+	@echo ""
+	@echo "  Test users (password: Repro1234!):"
+	@echo "    alice.johnson   bob.smith    carol.white  dave.brown"
+	@echo "    eve.davis       frank.miller grace.wilson henry.moore"
+	@echo ""
+`
+	}
+
+	phonyExtra := " upload-license"
 	if g.plan.Services.Auth.LDAPEnabled {
-		phonyExtra += " ldap-users"
+		phonyExtra += " ldap-users ldap-sync"
+	}
+	if g.plan.Services.Auth.KeycloakEnabled {
+		phonyExtra += " azure-ad"
 	}
 
 	content := `# Generated Repro Makefile
@@ -488,7 +602,24 @@ channels:
 	@test -n "$(NAMES)" || (echo "Usage: make channels NAMES=\"chan1,chan2\" PASS=Sysadmin1!" && exit 1)
 	mm-repro seed --project . --posts 0 --channels "$(NAMES)" $(if $(PASS),--password $(PASS),)
 	@echo "Channels created."
-` + ldapTargets + ngrokTargets
+` + ldapTargets + keycloakTargets + `
+## upload-license: Upload a Mattermost license after startup to unlock Enterprise features
+## Usage: make upload-license LICENSE=./your.mattermost-license PASS=Sysadmin1!
+## After upload: SAML and LDAP sync activate automatically (already pre-configured).
+upload-license:
+	@test -n "$(LICENSE)" || (echo "Usage: make upload-license LICENSE=./path/to.mattermost-license PASS=Sysadmin1!" && exit 1)
+	@test -f "$(LICENSE)" || (echo "Error: File not found: $(LICENSE)" && exit 1)
+	@PASS=$${PASS:-Sysadmin1!}; \
+	 TOKEN=$$(curl -sf -X POST http://localhost:8065/api/v4/users/login \
+	     -H "Content-Type: application/json" \
+	     -d "{\"login_id\":\"sysadmin\",\"password\":\"$$PASS\"}" -D - 2>/dev/null \
+	   | grep -i '^token:' | awk '{print $$2}' | tr -d '\r'); \
+	 test -n "$$TOKEN" || (echo "✗ Auth failed — run 'make admin' first." && exit 1); \
+	 curl -sf -X POST http://localhost:8065/api/v4/license \
+	     -H "Authorization: Bearer $$TOKEN" -F "license=@$(LICENSE)" > /dev/null && \
+	 echo "✓ License uploaded. Enterprise features (SAML, LDAP sync) are now active." || \
+	 echo "✗ Upload may have failed — check Mattermost logs with 'make logs'."
+` + ngrokTargets
 	return g.writeFile("Makefile", content)
 }
 

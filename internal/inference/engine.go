@@ -236,21 +236,30 @@ func (e *Engine) inferAuth(plan *models.ReproPlan, sp *models.SupportPackage) {
 		})
 	}
 
-	if e.flags.WithSAML || sp.Auth.HasSAML || sp.Auth.HasOIDC {
+	if e.flags.WithSAML || e.flags.WithAzureAD || sp.Auth.HasSAML || sp.Auth.HasOIDC {
 		authPlan.KeycloakEnabled = true
 		authPlan.KeycloakImage = "quay.io/keycloak/keycloak:23.0"
+		authPlan.SAMLEnabled = true
 		plan.Approximations = append(plan.Approximations, models.Approximation{
 			Component:   "saml",
-			Description: fmt.Sprintf("Local Keycloak used to approximate SAML provider '%s'", sp.Auth.SAMLProvider),
+			Description: fmt.Sprintf("Local Keycloak used to approximate SAML/OIDC provider '%s'", sp.Auth.SAMLProvider),
 			Reason:      "Customer IdP not accessible; Keycloak provides compatible local SAML/OIDC IdP",
 		})
 		plan.Stubbed = append(plan.Stubbed, models.StubbedItem{
 			Component: "saml-certificates",
-			Reason:    "Customer SAML certificates cannot be reused; new self-signed certs generated",
+			Reason:    "Customer SAML certificates cannot be reused; Keycloak generates self-signed certs",
 			StubType:  "placeholder",
 		})
+		if sp.Auth.SAMLProvider == "azure-ad" || e.flags.WithAzureAD {
+			plan.Approximations = append(plan.Approximations, models.Approximation{
+				Component:   "azure-ad",
+				Description: "Local Keycloak simulates Azure AD — OIDC works without license, SAML requires Enterprise",
+				Reason:      "Azure AD (Entra ID) not accessible locally; Keycloak used as local identity provider",
+			})
+		}
 	}
 
+	plan.LicenseProvided = e.flags.LicenseFile != ""
 	plan.Services.Auth = authPlan
 }
 

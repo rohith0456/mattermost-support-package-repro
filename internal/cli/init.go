@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -17,22 +18,24 @@ import (
 )
 
 var (
-	initSupportPackage    string
-	initOutputDir         string
-	initForceDB           string
-	initForceSingle       bool
-	initForceMulti        bool
-	initWithOpenSearch    bool
-	initWithLDAP          bool
-	initWithSAML          bool
-	initWithMinIO         bool
-	initWithRTCD          bool
-	initWithGrafana       bool
-	initRedactStrict      bool
-	initIssueName         string
+	initSupportPackage     string
+	initOutputDir          string
+	initForceDB            string
+	initForceSingle        bool
+	initForceMulti         bool
+	initWithOpenSearch     bool
+	initWithLDAP           bool
+	initWithSAML           bool
+	initWithAzureAD        bool
+	initWithMinIO          bool
+	initWithRTCD           bool
+	initWithGrafana        bool
+	initRedactStrict       bool
+	initIssueName          string
 	initWithKubernetes     bool
 	initForceDockerCompose bool
 	initWithNgrok          bool
+	initLicenseFile        string
 )
 
 var initCmd = &cobra.Command{
@@ -61,6 +64,7 @@ func init() {
 	initCmd.Flags().BoolVar(&initWithOpenSearch, "with-opensearch", false, "Include OpenSearch service")
 	initCmd.Flags().BoolVar(&initWithLDAP, "with-ldap", false, "Include local OpenLDAP service")
 	initCmd.Flags().BoolVar(&initWithSAML, "with-saml", false, "Include local Keycloak (SAML/OIDC) service")
+	initCmd.Flags().BoolVar(&initWithAzureAD, "with-azure-ad", false, "Include Keycloak configured as Azure AD (OIDC works without license; SAML needs Enterprise)")
 	initCmd.Flags().BoolVar(&initWithMinIO, "with-minio", false, "Include local MinIO (S3-compatible storage)")
 	initCmd.Flags().BoolVar(&initWithRTCD, "with-rtcd", false, "Include local RTCD (Calls) service")
 	initCmd.Flags().BoolVar(&initWithGrafana, "with-grafana", false, "Include Prometheus + Grafana observability stack")
@@ -68,6 +72,7 @@ func init() {
 	initCmd.Flags().BoolVar(&initWithKubernetes, "with-kubernetes", false, "Generate Kubernetes manifests (kind) instead of Docker Compose")
 	initCmd.Flags().BoolVar(&initForceDockerCompose, "force-docker-compose", false, "Force Docker Compose output even when a Kubernetes deployment is detected")
 	initCmd.Flags().BoolVar(&initWithNgrok, "with-ngrok", false, "Include ngrok tunnel for mobile/remote access (Docker Compose only)")
+	initCmd.Flags().StringVar(&initLicenseFile, "license", "", "Path to a Mattermost license file — pre-loads it so Enterprise features (LDAP sync, SAML) are active from first boot")
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
@@ -183,13 +188,21 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	printInfo(fmt.Sprintf("%s: Building repro plan and generating project...", stepLabel))
 
+	// Validate license file if provided
+	if initLicenseFile != "" {
+		if _, err := os.Stat(initLicenseFile); os.IsNotExist(err) {
+			return fmt.Errorf("license file not found: %s", initLicenseFile)
+		}
+	}
+
 	flags := models.ReproFlags{
 		ForceDB:            initForceDB,
 		ForceSingleNode:    initForceSingle,
 		ForceMultiNode:     initForceMulti,
 		WithOpenSearch:     initWithOpenSearch,
 		WithLDAP:           initWithLDAP,
-		WithSAML:           initWithSAML,
+		WithSAML:           initWithSAML || initWithAzureAD,
+		WithAzureAD:        initWithAzureAD,
 		WithMinIO:          initWithMinIO,
 		WithRTCD:           initWithRTCD,
 		WithGrafana:        initWithGrafana,
@@ -197,6 +210,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		WithKubernetes:     initWithKubernetes,
 		ForceDockerCompose: initForceDockerCompose,
 		WithNgrok:          initWithNgrok,
+		LicenseFile:        initLicenseFile,
 	}
 	engine := inference.NewEngine(flags)
 	plan := engine.Infer(sp, outputDir)
@@ -205,6 +219,20 @@ func runInit(cmd *cobra.Command, args []string) error {
 	created, err := gen.Generate()
 	if err != nil {
 		return fmt.Errorf("generating repro project: %w", err)
+	}
+
+	// Copy license file into output dir so it can be bind-mounted into the container
+	if initLicenseFile != "" {
+		licensesDir := filepath.Join(outputDir, "licenses")
+		if err := os.MkdirAll(licensesDir, 0o750); err != nil {
+			return fmt.Errorf("creating licenses dir: %w", err)
+		}
+		dest := filepath.Join(licensesDir, "mattermost.mattermost-license")
+		if err := copyFile(initLicenseFile, dest); err != nil {
+			return fmt.Errorf("copying license file: %w", err)
+		}
+		created = append(created, dest)
+		printSuccess(fmt.Sprintf("License copied to: %s/licenses/", outputDir))
 	}
 
 	fmt.Println()
@@ -250,6 +278,43 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if initSupportPackage != "" {
 		fmt.Printf("  cat %s/REDACTION_REPORT.md\n", outputDir)
 	}
+	if plan.Services.Auth.KeycloakEnabled {
+		fmt.Printf("\nAzure AD / SSO:\n")
+		if plan.LicenseProvided {
+			fmt.Printf("  make azure-ad   # show OIDC + SAML test credentials (both active)\n")
+		} else {
+			fmt.Printf("  make azure-ad   # OIDC works now; SAML needs: make upload-license LICENSE=./your.license\n")
+		}
+	}
+	if plan.Services.Auth.LDAPEnabled {
+		fmt.Printf("\nLDAP:\n")
+		fmt.Printf("  make ldap-users  # load 8 test users into OpenLDAP\n")
+		if plan.LicenseProvided {
+			fmt.Printf("  make ldap-sync   # trigger LDAP sync (license active)\n")
+		} else {
+			fmt.Printf("  make ldap-sync   # trigger sync (after uploading license)\n")
+		}
+	}
 
 	return nil
+}
+
+// copyFile copies src to dst, creating dst if it doesn't exist.
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Close()
 }

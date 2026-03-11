@@ -219,15 +219,18 @@ func keycloakService() string {
   keycloak:
     image: quay.io/keycloak/keycloak:23.0
     restart: unless-stopped
-    command: start-dev
+    # --import-realm loads keycloak/repro-realm.json on first start:
+    # configures OIDC client (works without license) + SAML client (needs Enterprise license)
+    command: start-dev --import-realm
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_password}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-keycloak_admin_local_repro_only}
       KC_HTTP_PORT: 8080
     ports:
       - "8080:8080"
     volumes:
       - keycloak_data:/opt/keycloak/data
+      - ./keycloak:/opt/keycloak/data/import:ro
     networks:
       - mm-repro
     healthcheck:
@@ -332,7 +335,7 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
       MM_LDAPSETTINGS_SYNCINTERVALMINUTES: "60"
 `)
 	}
-	// OIDC via Keycloak
+	// OIDC via Keycloak (no license required — uses MM_GITLABSETTINGS_*)
 	if p.Services.Auth.KeycloakEnabled {
 		extra.WriteString(`      MM_GITLABSETTINGS_ENABLE: "true"
       MM_GITLABSETTINGS_ID: ${OIDC_CLIENT_ID:-mattermost-client}
@@ -341,6 +344,35 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
       MM_GITLABSETTINGS_TOKENENDPOINT: http://keycloak:8080/realms/repro/protocol/openid-connect/token
       MM_GITLABSETTINGS_USERAPIENDPOINT: http://keycloak:8080/realms/repro/protocol/openid-connect/userinfo
 `)
+	}
+	// SAML via Keycloak (requires Enterprise license — pre-configured, activates on license upload)
+	// MM_SAMLSETTINGS_IDPMETADATAURL causes Mattermost to auto-fetch the cert from Keycloak.
+	// No manual cert upload in System Console is needed.
+	if p.Services.Auth.SAMLEnabled {
+		extra.WriteString(`      MM_SAMLSETTINGS_ENABLE: "true"
+      MM_SAMLSETTINGS_VERIFY: "false"
+      MM_SAMLSETTINGS_ENCRYPT: "false"
+      MM_SAMLSETTINGS_IDPMETADATAURL: http://keycloak:8080/realms/repro/protocol/saml/descriptor
+      MM_SAMLSETTINGS_IDPURL: http://keycloak:8080/realms/repro/protocol/saml
+      MM_SAMLSETTINGS_IDPISSUERURL: http://keycloak:8080/realms/repro
+      MM_SAMLSETTINGS_SERVICEPROVIDERENTIFIER: http://localhost:8065
+      MM_SAMLSETTINGS_ASSERTIONCONSUMERSERVICEURL: http://localhost:8065/login/sso/saml
+      MM_SAMLSETTINGS_EMAILATTRIBUTE: email
+      MM_SAMLSETTINGS_USERNAMEATTRIBUTE: preferred_username
+      MM_SAMLSETTINGS_FIRSTNAMEATTRIBUTE: given_name
+      MM_SAMLSETTINGS_LASTNAMEATTRIBUTE: family_name
+`)
+	}
+	// License pre-loaded (when --license flag was provided at init time)
+	if p.LicenseProvided {
+		extra.WriteString(`      MM_SERVICESETTINGS_LICENSEFILELOCATION: /mattermost/licenses/mattermost.mattermost-license
+`)
+	}
+
+	// Extra bind-mount volumes (e.g. license file pre-load)
+	var extraVolumes strings.Builder
+	if p.LicenseProvided {
+		extraVolumes.WriteString("      - ./licenses:/mattermost/licenses:ro\n")
 	}
 
 	listenPort := fmt.Sprintf("%d", port)
@@ -374,12 +406,12 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
       - %s_config:/mattermost/config
       - %s_plugins:/mattermost/plugins
       - %s_client_plugins:/mattermost/client/plugins
-    networks:
+%s    networks:
       - mm-repro
 %s    healthcheck:
       disable: true
 
-`, name, image, dbDriver, dbDatasource, siteURL, listenPort, extra.String(), port, listenPort, name, name, name, name, deps.String())
+`, name, image, dbDriver, dbDatasource, siteURL, listenPort, extra.String(), port, listenPort, name, name, name, name, extraVolumes.String(), deps.String())
 }
 
 func nginxService(nodeCount int) string {

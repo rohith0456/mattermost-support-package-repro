@@ -255,7 +255,7 @@ Every service mm-repro can spin up, what it does, and how to reach it:
 | **OpenSearch** | Full-text search engine — faster and richer than database search; drop-in open-source replacement for Elasticsearch | http://localhost:9200 | No login |
 | **OpenLDAP** | LDAP directory server for testing LDAP auth flows — run `make ldap-users` to load 8 test users after startup | internal | auto-generated |
 | **phpLDAPadmin** | Web UI to browse and manage the OpenLDAP directory — view users, groups, and attributes | http://localhost:8089 | `cn=admin,dc=repro,dc=local` / `ldap_admin_local_repro_only` |
-| **Keycloak** | Identity provider for testing SAML 2.0 and OIDC single-sign-on authentication | http://localhost:8080 | `admin` / `keycloak_admin_local_repro_only` |
+| **Keycloak** | Local Azure AD / IdP simulation — OIDC ("Sign in with GitLab", no license needed) + SAML ("Sign in with SAML", needs Enterprise license). Realm auto-imported on startup. Run `make azure-ad` for status. | http://localhost:8080 | `admin` / `keycloak_admin_local_repro_only` |
 | **Prometheus** | Scrapes and stores performance metrics from Mattermost every 15 seconds | http://localhost:9090 | No login |
 | **Grafana** | Dashboard for visualising Prometheus metrics — API latency, DB queries, memory, active users | http://localhost:3000 | `admin` / `grafana_admin_local_repro_only` |
 | **RTCD** | Real-Time Communications Daemon — handles WebRTC signalling for Mattermost Calls (video/voice) | internal | auto-generated |
@@ -414,9 +414,82 @@ This loads 8 test users and 4 groups into the running OpenLDAP container. Re-run
 
 **Password for all test users:** `Repro1234!`
 
-After loading, trigger a sync in Mattermost: **System Console → Authentication → AD/LDAP → Synchronize Now**. Users will appear and can log in with `uid@repro.local` + `Repro1234!`.
+After loading, trigger a sync via the Makefile (no System Console steps needed — all LDAP settings are already configured):
+
+```bash
+make ldap-sync PASS=Sysadmin1!   # requires Enterprise license
+```
+
+Or manually in Mattermost: **System Console → Authentication → AD/LDAP → Synchronize Now**. Users can then log in with `uid@repro.local` + `Repro1234!`.
 
 Verify the directory at **http://localhost:8089** (phpLDAPadmin — bind DN: `cn=admin,dc=repro,dc=local`, password: `ldap_admin_local_repro_only`).
+
+---
+
+## 🔑 Azure AD / SAML / OIDC
+
+When your issue involves Azure AD authentication, use `--with-azure-ad` (or it's auto-detected from the support package). This spins up a pre-configured local Keycloak that simulates Azure AD — no real Azure tenant needed.
+
+```bash
+mm-repro init --with-azure-ad --support-package ./support-package.zip
+cd generated-repro/20250310-143022/
+make run && make admin
+make azure-ad   # shows OIDC + SAML status + test credentials
+```
+
+**Two auth modes, one Keycloak:**
+
+| Mode | License needed | Sign-in button | Works |
+|------|---------------|----------------|-------|
+| **OIDC** (Entra ID simulation) | No | "Sign in with GitLab" | ✅ Immediately |
+| **SAML** (Azure AD SAML 2.0) | Yes (Enterprise) | "Sign in with SAML" | ✅ After license upload |
+
+Both are fully pre-configured — no System Console steps needed. SAML activates automatically when you upload a license.
+
+**Test users** (same 8 as LDAP, password `Repro1234!`):
+
+| User | Role |
+|------|------|
+| `alice.johnson` | Developer |
+| `bob.smith` | Developer |
+| `carol.white` | Team Lead |
+| `dave.brown` | Designer |
+| `eve.davis` | QA Engineer |
+| `frank.miller` | Support Engineer |
+| `grace.wilson` | Project Manager |
+| `henry.moore` | System Admin |
+
+**Keycloak console:** http://localhost:8080 — login `admin` / `keycloak_admin_local_repro_only`, realm `repro`
+
+> ℹ️ Keycloak automatically imports the realm configuration (`keycloak/repro-realm.json`) on first startup via `--import-realm`. No manual setup required.
+
+---
+
+## 📋 Enterprise License
+
+Mattermost Enterprise features (LDAP sync, SAML SSO) require a license. mm-repro gives you two ways to handle this:
+
+### Option A — Pre-load at init (recommended)
+
+Provide the license file when you generate the environment. Mattermost starts with it already loaded — Enterprise features are active from the very first `make run`:
+
+```bash
+mm-repro init --support-package ./support-package.zip --license ./your.mattermost-license
+cd generated-repro/20250310-143022/
+make run && make admin
+# SAML and LDAP sync work immediately — no license upload step needed
+```
+
+### Option B — Upload after startup
+
+No license at init? Upload it with a single command after `make run && make admin`:
+
+```bash
+make upload-license LICENSE=./your.mattermost-license PASS=Sysadmin1!
+# ✓ License uploaded. Enterprise features (SAML, LDAP sync) now active.
+```
+
+That's it — all SAML, LDAP, and other Enterprise settings are **already pre-configured** in the generated environment. Uploading the license is all it takes to activate them. No System Console reconfiguration needed.
 
 ---
 
