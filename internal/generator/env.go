@@ -26,6 +26,22 @@ func (g *Generator) generateEnv() (string, error) {
 	sb.WriteString("\n")
 
 	sb.WriteString("# ============================================================\n")
+	sb.WriteString("# HOST PORT OVERRIDES\n")
+	sb.WriteString("# Change these if a port is already in use on your machine.\n")
+	sb.WriteString("# After changing MM_PORT, also update MM_SITE_URL above.\n")
+	sb.WriteString("# ============================================================\n")
+	sb.WriteString("MM_PORT=8065\n")
+	sb.WriteString("MAILPIT_PORT=8025\n")
+	sb.WriteString("MAILPIT_SMTP_PORT=1025\n")
+	if p.Services.Observability.PrometheusEnabled {
+		sb.WriteString("PROMETHEUS_PORT=9090\n")
+	}
+	if p.Services.Observability.GrafanaEnabled {
+		sb.WriteString("GRAFANA_PORT=3000\n")
+	}
+	sb.WriteString("\n")
+
+	sb.WriteString("# ============================================================\n")
 	sb.WriteString("# DATABASE SETTINGS (LOCAL REPRO ONLY)\n")
 	sb.WriteString("# ============================================================\n")
 
@@ -111,7 +127,7 @@ func (g *Generator) generateEnv() (string, error) {
 	sb.WriteString("# ============================================================\n")
 	sb.WriteString("# EMAIL SETTINGS (Mailpit local stub — captures all outgoing emails)\n")
 	sb.WriteString("# ============================================================\n")
-	sb.WriteString("MM_SMTP_SERVER=mailhog\n")
+	sb.WriteString("MM_SMTP_SERVER=mailpit\n")
 	sb.WriteString("MM_SMTP_PORT=1025\n")
 	sb.WriteString("\n")
 

@@ -269,12 +269,12 @@ func minioService(port int) string {
 
 func mailhogService(smtpPort, uiPort int) string {
 	return fmt.Sprintf(`
-  mailhog:
+  mailpit:
     image: axllent/mailpit:latest
     restart: unless-stopped
     ports:
-      - "%d:1025"
-      - "%d:8025"
+      - "${MAILPIT_SMTP_PORT:-%d}:1025"
+      - "${MAILPIT_PORT:-%d}:8025"
     networks:
       - mm-repro
 
@@ -388,19 +388,20 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
 	return fmt.Sprintf(`
   %s:
     image: %s
+    platform: linux/amd64
     restart: unless-stopped
     environment:
       MM_SQLSETTINGS_DRIVERNAME: ${MM_DB_DRIVER:-%s}
       MM_SQLSETTINGS_DATASOURCE: ${MM_DATASOURCE:-%s}
       MM_SERVICESETTINGS_SITEURL: %s
       MM_SERVICESETTINGS_LISTENADDRESS: ":%s"
-      MM_EMAILSETTINGS_SMTPSERVER: mailhog
-      MM_EMAILSETTINGS_SMTPPORT: "1025"
+      MM_EMAILSETTINGS_SMTPSERVER: mailpit
+      MM_EMAILSETTINGS_SMTPPORT: "${MAILPIT_SMTP_PORT:-1025}"
       MM_EMAILSETTINGS_ENABLESMTPAUTH: "false"
       MM_LOGSETTINGS_CONSOLELEVEL: INFO
       MM_LOGSETTINGS_FILELEVEL: DEBUG
 %s    ports:
-      - "%d:%s"
+      - "${MM_PORT:-%d}:%s"
     volumes:
       - %s_logs:/mattermost/logs
       - %s_config:/mattermost/config
@@ -461,7 +462,7 @@ func prometheusService(port int) string {
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
     ports:
-      - "%d:9090"
+      - "${PROMETHEUS_PORT:-%d}:9090"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -480,7 +481,7 @@ func grafanaService(port int) string {
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin_password}
     ports:
-      - "%d:3000"
+      - "${GRAFANA_PORT:-%d}:3000"
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
