@@ -76,7 +76,7 @@ type DatabaseServicePlan struct {
 // SearchServicePlan describes the search backend service.
 type SearchServicePlan struct {
 	Enabled     bool   `json:"enabled"`
-	Backend     string `json:"backend"` // "opensearch", "none"
+	Backend     string `json:"backend"` // "opensearch", "elasticsearch", "database"
 	Image       string `json:"image"`
 	Tag         string `json:"tag"`
 	ExposedPort int    `json:"exposed_port"`
@@ -177,6 +177,7 @@ type ReproFlags struct {
 	ForceSingleNode    bool   `json:"force_single_node"`
 	ForceMultiNode     bool   `json:"force_multi_node"`
 	WithOpenSearch     bool   `json:"with_opensearch"`
+	WithElasticsearch  bool   `json:"with_elasticsearch"`
 	WithLDAP           bool   `json:"with_ldap"`
 	WithSAML           bool   `json:"with_saml"`
 	WithAzureAD        bool   `json:"with_azure_ad,omitempty"`

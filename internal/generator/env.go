@@ -190,8 +190,12 @@ func (g *Generator) generateReproSummary() (string, error) {
 			p.Services.Database.Type, p.Services.Database.ExposedPort))
 	}
 	if p.Services.Search.Enabled {
-		sb.WriteString(fmt.Sprintf("| OpenSearch | Enabled | %d | Approximates %s |\n",
-			p.Services.Search.ExposedPort, p.Services.Search.Backend))
+		searchLabel := "OpenSearch"
+		if p.Services.Search.Backend == "elasticsearch" {
+			searchLabel = "Elasticsearch"
+		}
+		sb.WriteString(fmt.Sprintf("| %s | Enabled | %d | Backend: %s |\n",
+			searchLabel, p.Services.Search.ExposedPort, p.Services.Search.Backend))
 	}
 	if p.Services.Auth.LDAPEnabled {
 		sb.WriteString("| OpenLDAP | Enabled | 389 | Stub users only |\n")

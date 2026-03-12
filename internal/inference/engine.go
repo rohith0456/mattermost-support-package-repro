@@ -193,7 +193,22 @@ func (e *Engine) inferDatabase(plan *models.ReproPlan, sp *models.SupportPackage
 }
 
 func (e *Engine) inferSearch(plan *models.ReproPlan, sp *models.SupportPackage) {
-	if e.flags.WithOpenSearch || sp.Search.Backend == "elasticsearch" || sp.Search.Backend == "opensearch" {
+	useElasticsearch := e.flags.WithElasticsearch || sp.Search.Backend == "elasticsearch"
+	useOpenSearch := e.flags.WithOpenSearch || sp.Search.Backend == "opensearch"
+
+	switch {
+	case useElasticsearch:
+		// Use a real Elasticsearch container — exact match, no approximation needed.
+		plan.Services.Search = models.SearchServicePlan{
+			Enabled:     true,
+			Backend:     "elasticsearch",
+			Image:       "docker.elastic.co/elasticsearch/elasticsearch",
+			Tag:         "8.11.0",
+			ExposedPort: 9200,
+		}
+
+	case useOpenSearch:
+		// Use OpenSearch — exact match for OpenSearch deployments.
 		plan.Services.Search = models.SearchServicePlan{
 			Enabled:     true,
 			Backend:     "opensearch",
@@ -201,14 +216,8 @@ func (e *Engine) inferSearch(plan *models.ReproPlan, sp *models.SupportPackage) 
 			Tag:         "2.11.0",
 			ExposedPort: 9200,
 		}
-		if sp.Search.Backend == "elasticsearch" {
-			plan.Approximations = append(plan.Approximations, models.Approximation{
-				Component:   "search",
-				Description: "Using OpenSearch locally to approximate Elasticsearch",
-				Reason:      "OpenSearch is a compatible open-source alternative suitable for local repro",
-			})
-		}
-	} else {
+
+	default:
 		plan.Services.Search = models.SearchServicePlan{
 			Enabled: false,
 			Backend: "database",
@@ -217,7 +226,7 @@ func (e *Engine) inferSearch(plan *models.ReproPlan, sp *models.SupportPackage) 
 			plan.Approximations = append(plan.Approximations, models.Approximation{
 				Component:   "search",
 				Description: fmt.Sprintf("Search backend '%s' not enabled; using database search", sp.Search.Backend),
-				Reason:      "Use --with-opensearch flag to enable local OpenSearch container",
+				Reason:      "Use --with-opensearch or --with-elasticsearch to enable a local search container",
 			})
 		}
 	}

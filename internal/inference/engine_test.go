@@ -151,12 +151,19 @@ func TestInferSearch(t *testing.T) {
 		assert.Equal(t, "opensearch", plan.Services.Search.Backend)
 	})
 
-	t.Run("elasticsearch detected auto-enables opensearch", func(t *testing.T) {
+	t.Run("elasticsearch detected auto-enables elasticsearch", func(t *testing.T) {
 		sp := makeMinimalPackage("8.1.3", "postgres", false)
 		sp.Search = models.SearchInfo{Backend: "elasticsearch"}
 		plan := inference.NewEngine(models.ReproFlags{}).Infer(sp, "./output")
 		assert.True(t, plan.Services.Search.Enabled)
-		assert.Equal(t, "opensearch", plan.Services.Search.Backend)
+		assert.Equal(t, "elasticsearch", plan.Services.Search.Backend)
+	})
+
+	t.Run("with-elasticsearch flag", func(t *testing.T) {
+		sp := makeMinimalPackage("8.1.3", "postgres", false)
+		plan := inference.NewEngine(models.ReproFlags{WithElasticsearch: true}).Infer(sp, "./output")
+		assert.True(t, plan.Services.Search.Enabled)
+		assert.Equal(t, "elasticsearch", plan.Services.Search.Backend)
 	})
 
 	t.Run("no search by default", func(t *testing.T) {

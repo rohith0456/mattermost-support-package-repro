@@ -24,6 +24,7 @@ var (
 	initForceSingle        bool
 	initForceMulti         bool
 	initWithOpenSearch     bool
+	initWithElasticsearch  bool
 	initWithLDAP           bool
 	initWithSAML           bool
 	initWithAzureAD        bool
@@ -62,6 +63,7 @@ func init() {
 	initCmd.Flags().BoolVar(&initForceSingle, "force-single-node", false, "Force single-node topology")
 	initCmd.Flags().BoolVar(&initForceMulti, "force-multi-node", false, "Force multi-node topology")
 	initCmd.Flags().BoolVar(&initWithOpenSearch, "with-opensearch", false, "Include OpenSearch service")
+	initCmd.Flags().BoolVar(&initWithElasticsearch, "with-elasticsearch", false, "Include Elasticsearch service (use when support package used Elasticsearch)")
 	initCmd.Flags().BoolVar(&initWithLDAP, "with-ldap", false, "Include local OpenLDAP service")
 	initCmd.Flags().BoolVar(&initWithSAML, "with-saml", false, "Include local Keycloak (SAML/OIDC) service")
 	initCmd.Flags().BoolVar(&initWithAzureAD, "with-azure-ad", false, "Include Keycloak configured as Azure AD (OIDC works without license; SAML needs Enterprise)")
@@ -200,6 +202,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		ForceSingleNode:    initForceSingle,
 		ForceMultiNode:     initForceMulti,
 		WithOpenSearch:     initWithOpenSearch,
+		WithElasticsearch:  initWithElasticsearch,
 		WithLDAP:           initWithLDAP,
 		WithSAML:           initWithSAML || initWithAzureAD,
 		WithAzureAD:        initWithAzureAD,

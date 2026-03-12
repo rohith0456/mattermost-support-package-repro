@@ -29,7 +29,11 @@ func (g *Generator) generateCompose() (string, error) {
 
 	// Search
 	if p.Services.Search.Enabled {
-		sb.WriteString(opensearchService(p.Services.Search.ExposedPort))
+		if p.Services.Search.Backend == "elasticsearch" {
+			sb.WriteString(elasticsearchService(p.Services.Search.ExposedPort))
+		} else {
+			sb.WriteString(opensearchService(p.Services.Search.ExposedPort))
+		}
 	}
 
 	// LDAP
@@ -145,6 +149,32 @@ func mysqlService(port int) string {
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD:-rootpassword}"]
       interval: 10s
       timeout: 5s
+      retries: 5
+
+`, port)
+}
+
+func elasticsearchService(port int) string {
+	return fmt.Sprintf(`
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    platform: linux/amd64
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "%d:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - mm-repro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'status'"]
+      interval: 30s
+      timeout: 10s
       retries: 5
 
 `, port)
@@ -294,7 +324,11 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
 	var deps strings.Builder
 	deps.WriteString(fmt.Sprintf("    depends_on:\n      %s:\n        condition: service_healthy\n", dbServiceName))
 	if p.Services.Search.Enabled {
-		deps.WriteString("      opensearch:\n        condition: service_healthy\n")
+		searchSvc := "opensearch"
+		if p.Services.Search.Backend == "elasticsearch" {
+			searchSvc = "elasticsearch"
+		}
+		deps.WriteString(fmt.Sprintf("      %s:\n        condition: service_healthy\n", searchSvc))
 	}
 	if p.Services.FileStorage.UseMinIO {
 		deps.WriteString("      minio:\n        condition: service_healthy\n")
@@ -321,16 +355,20 @@ func mattermostService(name, image string, port int, siteURL string, p *models.R
       MM_CLUSTERSETTINGS_CLUSTERNAME: repro-cluster
 `)
 	}
-	// OpenSearch (requires Enterprise license — pre-configured, activates on license upload + restart)
+	// Search backend (requires Enterprise license — pre-configured, activates on license upload + restart)
 	if p.Services.Search.Enabled {
-		extra.WriteString(`      MM_ELASTICSEARCHSETTINGS_CONNECTIONURL: http://opensearch:9200
+		searchSvc := "opensearch"
+		if p.Services.Search.Backend == "elasticsearch" {
+			searchSvc = "elasticsearch"
+		}
+		extra.WriteString(fmt.Sprintf(`      MM_ELASTICSEARCHSETTINGS_CONNECTIONURL: http://%s:9200
       MM_ELASTICSEARCHSETTINGS_ENABLEINDEXING: "true"
       MM_ELASTICSEARCHSETTINGS_ENABLESEARCHING: "true"
       MM_ELASTICSEARCHSETTINGS_ENABLEAUTOCOMPLETE: "true"
       MM_ELASTICSEARCHSETTINGS_SKIPTLSVERIFICATION: "true"
       MM_ELASTICSEARCHSETTINGS_USERNAME: ""
       MM_ELASTICSEARCHSETTINGS_PASSWORD: ""
-`)
+`, searchSvc))
 	}
 	// LDAP
 	if p.Services.Auth.LDAPEnabled {
@@ -552,6 +590,16 @@ func networksAndVolumes(p *models.ReproPlan) string {
 		mmVolumes.WriteString("  mattermost_data:\n  mattermost_logs:\n  mattermost_config:\n  mattermost_plugins:\n  mattermost_client_plugins:\n")
 	}
 
+	// Include only the volume for the active search backend
+	var searchVolume string
+	if p.Services.Search.Enabled {
+		if p.Services.Search.Backend == "elasticsearch" {
+			searchVolume = "  elasticsearch_data:\n"
+		} else {
+			searchVolume = "  opensearch_data:\n"
+		}
+	}
+
 	return fmt.Sprintf(`
 networks:
   mm-repro:
@@ -560,12 +608,11 @@ networks:
 volumes:
   postgres_data:
   mysql_data:
-  opensearch_data:
-  ldap_data:
+%s  ldap_data:
   ldap_config:
   keycloak_data:
   minio_data:
 %s  prometheus_data:
   grafana_data:
-`, mmVolumes.String())
+`, searchVolume, mmVolumes.String())
 }
