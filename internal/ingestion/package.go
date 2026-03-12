@@ -68,7 +68,9 @@ func (i *Ingestor) Ingest(srcPath string) (*PackageInfo, error) {
 func (p *PackageInfo) walkFiles() error {
 	return filepath.Walk(p.ExtractDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // tolerate walk errors
+			// Non-fatal: log to stderr and continue with remaining files
+			fmt.Fprintf(os.Stderr, "warning: skipping unreadable file %s: %v\n", path, err)
+			return nil
 		}
 		if info.IsDir() {
 			return nil
@@ -207,9 +209,12 @@ func extractFile(f *zip.File, target string) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
 
 	// Limit file size to 500MB to prevent decompression bombs
 	_, err = io.Copy(out, io.LimitReader(rc, 500*1024*1024))
+	// Close explicitly (not deferred) so write errors surfaced at Close() are not lost
+	if closeErr := out.Close(); closeErr != nil && err == nil {
+		err = closeErr
+	}
 	return err
 }

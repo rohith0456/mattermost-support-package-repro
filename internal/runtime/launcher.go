@@ -3,9 +3,11 @@ package runtime
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 )
 
 // Launcher manages the Docker Compose lifecycle for a repro project.
@@ -138,10 +140,13 @@ func CheckPorts(ports []int) []int {
 }
 
 func isPortAvailable(port int) bool {
-	cmd := exec.Command("docker", "run", "--rm", "--network=host",
-		"alpine:latest", "sh", "-c",
-		fmt.Sprintf("nc -z localhost %d 2>/dev/null; echo $?", port))
-	// This is a best-effort check; don't fail if docker isn't running
-	_ = cmd
-	return true // simplified — real implementation would check TCP
+	addr := fmt.Sprintf("localhost:%d", port)
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	if err != nil {
+		// Connection refused or timeout — port is free
+		return true
+	}
+	conn.Close()
+	// Successfully connected — port is already in use
+	return false
 }

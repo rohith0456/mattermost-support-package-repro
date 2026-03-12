@@ -103,6 +103,7 @@ func postgresService(port int) string {
 	return fmt.Sprintf(`
   postgres:
     image: postgres:15-alpine
+    platform: linux/amd64
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${MM_DB_USER:-mmuser}
@@ -127,6 +128,7 @@ func mysqlService(port int) string {
 	return fmt.Sprintf(`
   mysql:
     image: mysql:8.0
+    platform: linux/amd64
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MM_DB_ROOT_PASSWORD:-rootpassword}
@@ -152,6 +154,7 @@ func opensearchService(port int) string {
 	return fmt.Sprintf(`
   opensearch:
     image: opensearchproject/opensearch:2.11.0
+    platform: linux/amd64
     restart: unless-stopped
     environment:
       - discovery.type=single-node
@@ -246,6 +249,7 @@ func minioService(port int) string {
 	return fmt.Sprintf(`
   minio:
     image: minio/minio:latest
+    platform: linux/amd64
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -449,6 +453,7 @@ func nginxService(nodeCount int) string {
 	return fmt.Sprintf(`
   nginx:
     image: nginx:alpine
+    platform: linux/amd64
     restart: unless-stopped
     command: /bin/sh -c "rm -f /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
     ports:
@@ -481,6 +486,7 @@ func prometheusService(port int) string {
 	return fmt.Sprintf(`
   prometheus:
     image: prom/prometheus:latest
+    platform: linux/amd64
     restart: unless-stopped
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -502,6 +508,7 @@ func grafanaService(port int) string {
 	return fmt.Sprintf(`
   grafana:
     image: grafana/grafana:latest
+    platform: linux/amd64
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}

@@ -2,10 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"net"
 	"os/exec"
 	"runtime"
-	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -150,20 +151,13 @@ func checkDiskSpace(allOK *bool) {
 }
 
 func isPortFreeSimple(port int) bool {
-	// Use nc or Test-NetConnection to check ports
-	if runtime.GOOS == "windows" {
-		out, err := exec.Command("powershell", "-Command",
-			fmt.Sprintf("(Test-NetConnection -ComputerName localhost -Port %d -WarningAction SilentlyContinue).TcpTestSucceeded", port)).Output()
-		if err != nil {
-			return true // assume free if check fails
-		}
-		return strings.TrimSpace(string(out)) == "False"
-	}
-
-	out, err := exec.Command("sh", "-c", fmt.Sprintf("nc -z localhost %d 2>/dev/null; echo $?", port)).Output()
+	addr := fmt.Sprintf("localhost:%d", port)
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
 	if err != nil {
+		// Connection refused or timed out — port is free
 		return true
 	}
-	code, _ := strconv.Atoi(strings.TrimSpace(string(out)))
-	return code != 0 // exit code 0 means port is in use
+	conn.Close()
+	// Successfully connected — port is already in use
+	return false
 }

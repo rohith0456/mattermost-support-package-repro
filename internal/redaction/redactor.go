@@ -4,6 +4,7 @@
 package redaction
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -111,7 +112,7 @@ func (r *Redactor) redactSlice(arr []interface{}, parentKey, location, jsonPath 
 					cat.Items = append(cat.Items, models.RedactedItem{
 						ConfigKey:     parentKey,
 						Location:      location,
-						JsonPath:      jsonPath + "[" + string(rune('0'+i)) + "]",
+						JsonPath:      jsonPath + fmt.Sprintf("[%d]", i),
 						Replacement:   replacement,
 						DetectionRule: ruleID,
 						WasEmpty:      false,

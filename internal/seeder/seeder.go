@@ -83,7 +83,9 @@ func (s *Seeder) Run(opts Options) error {
 	if err != nil {
 		return fmt.Errorf("seeding posts: %w", err)
 	}
-	fmt.Printf("  ✓ Created %d posts\n", count)
+	if count > 0 {
+		fmt.Printf("  ✓ Created %d posts\n", count)
+	}
 
 	return nil
 }
@@ -422,7 +424,7 @@ var emojiSet = []string{"thumbsup", "tada", "white_check_mark", "rocket", "fire"
 // ─── main seed loop ───────────────────────────────────────────────────────────
 
 func (s *Seeder) seedPosts(count int, withFiles bool, postChannel string) (int, error) {
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng := rand.New(rand.NewSource(rand.Int63()))
 
 	// Resolve the target channel slug (empty = distribute across defaults).
 	targetSlug := ""

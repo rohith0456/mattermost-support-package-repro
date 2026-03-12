@@ -22,6 +22,7 @@ func (p *Parser) Parse(np *ingestion.NormalizedPackage, srcPath string) *models.
 	sp.Version = ParseVersion(np)
 	sp.Topology = ParseTopology(np)
 	sp.Database = ParseDatabase(np)
+	sp.Search = ParseSearch(np)
 	sp.FileStorage = ParseFileStorage(np)
 	sp.Auth = ParseAuth(np)
 	sp.Plugins = ParsePlugins(np)

@@ -312,7 +312,11 @@ func (g *Generator) generatePluginReport() (string, error) {
 	sb.WriteString("|-----------|---------|---------|--------|--------|\n")
 
 	for _, plugin := range g.plan.Plugins {
-		enabled := "No"
+		// Action "skip" means the plugin was disabled or cannot be installed locally
+		enabled := "Yes"
+		if plugin.Action == "skip" {
+			enabled = "No"
+		}
 		version := plugin.Version
 		if version == "" {
 			version = "unknown"
