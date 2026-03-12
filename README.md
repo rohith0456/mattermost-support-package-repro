@@ -198,7 +198,7 @@ An interactive wizard walks you through every option:
     [2] Kubernetes (kind)  (kubectl apply — needs kind + kubectl)
 
 ── Optional Services
-  OpenSearch (advanced full-text search)? [y/N]:
+  OpenSearch / Elasticsearch (advanced full-text search)? [y/N]:
   LDAP authentication (local OpenLDAP with stub users)? [y/N]:
   SAML / OIDC authentication (local Keycloak IdP)? [y/N]:
   MinIO (local S3-compatible file storage)? [y/N]:
@@ -229,7 +229,8 @@ Need to match a more complex setup? Just add flags:
 mm-repro init --support-package ./support-package.zip \
   --with-ldap          # OpenLDAP (LDAP authentication)
   --with-saml          # Keycloak (SAML / OIDC)
-  --with-opensearch    # OpenSearch (search issues)
+  --with-opensearch      # OpenSearch (search issues)
+  --with-elasticsearch   # Elasticsearch (search issues — use when customer used ES)
   --with-minio         # MinIO (S3 file storage)
   --with-grafana       # Prometheus + Grafana (metrics)
   --with-ngrok         # public HTTPS tunnel (test from your phone!)
@@ -252,7 +253,8 @@ Every service mm-repro can spin up, what it does, and how to reach it:
 | **Mailpit** | Catches every outgoing email so nothing reaches real inboxes — view captured emails in its web UI | http://localhost:8025 | No login |
 | **nginx** | Load balancer in front of all Mattermost nodes in HA mode — distributes traffic evenly across the cluster | http://localhost:8065 | routes to all nodes |
 | **MinIO** | Local S3-compatible object storage — Mattermost stores file attachments here instead of on disk; required for HA so all nodes share one storage backend | http://localhost:9001 | `repro_minio_user` / `minio_password_local_repro_only` |
-| **OpenSearch** | Full-text search engine — faster and richer than database search; drop-in open-source replacement for Elasticsearch | http://localhost:9200 | No login |
+| **OpenSearch** | Full-text search engine — faster and richer than database search. Use when the support package used OpenSearch (`--with-opensearch`). Auto-detected from support package. | http://localhost:9200 | No login |
+| **Elasticsearch** | Full-text search engine — exact match for customers running Elasticsearch. Use when the support package used Elasticsearch (`--with-elasticsearch`). Auto-detected from support package. | http://localhost:9200 | No login |
 | **OpenLDAP** | LDAP directory server for testing LDAP auth flows — run `make ldap-users` to load 8 test users after startup | internal | auto-generated |
 | **phpLDAPadmin** | Web UI to browse and manage the OpenLDAP directory — view users, groups, and attributes | http://localhost:8089 | `cn=admin,dc=repro,dc=local` / `ldap_admin_local_repro_only` |
 | **Keycloak** | Local Azure AD / IdP simulation — OIDC ("Sign in with GitLab", no license needed) + SAML ("Sign in with SAML", needs Enterprise license). Realm auto-imported on startup. Run `make azure-ad` for status. | http://localhost:8080 | `admin` / `keycloak_admin_local_repro_only` |
@@ -543,7 +545,7 @@ Full `init` flags:
 --issue            Issue name for directory labeling
 --db               Force postgres or mysql
 --force-single-node / --force-multi-node
---with-opensearch / --with-ldap / --with-saml
+--with-opensearch / --with-elasticsearch / --with-ldap / --with-saml
 --with-minio / --with-rtcd / --with-grafana
 --with-kubernetes / --force-docker-compose
 --with-ngrok
