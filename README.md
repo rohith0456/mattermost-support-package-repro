@@ -248,7 +248,7 @@ Mix and match whatever the environment needs.
 
 ### Why it exists
 
-Consider a support engineer reproducing a customer issue. The customer runs Mattermost on a corporate Kubernetes cluster where Docker Hub is blocked by firewall policy — all images must be pulled from an internal Harbor registry (`harbor.corp.com`).
+Consider a support engineer reproducing a customer issue. The customer runs Mattermost on a corporate Kubernetes cluster where Docker Hub is blocked by firewall policy — all images must be pulled from an internal Harbor registry (`example.corp.com`).
 
 Without the flag, mm-repro generates:
 ```yaml
@@ -257,10 +257,10 @@ image: mattermost/mattermost-enterprise-edition:10.5.0
 ```
 Docker tries to pull these from Docker Hub at `make run` time — which fails on a network without internet access.
 
-With `--image-registry harbor.corp.com`, mm-repro generates:
+With `--image-registry example.corp.com`, mm-repro generates:
 ```yaml
-image: harbor.corp.com/postgres:15-alpine
-image: harbor.corp.com/mattermost/mattermost-enterprise-edition:10.5.0
+image: example.corp.com/postgres:15-alpine
+image: example.corp.com/mattermost/mattermost-enterprise-edition:10.5.0
 ```
 Docker pulls from the internal registry instead. That's the entire difference — the compose file, Makefile, env vars, nginx config, and all service configuration are identical in both cases.
 
