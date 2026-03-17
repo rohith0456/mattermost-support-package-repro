@@ -248,7 +248,7 @@ Mix and match whatever the environment needs.
 
 ### Why it exists
 
-Consider a support engineer reproducing a customer issue. The customer runs Mattermost on a corporate Kubernetes cluster where Docker Hub is blocked by firewall policy — all images must be pulled from an internal Harbor registry (`example.corp.com`).
+When running in a corporate Kubernetes cluster where Docker Hub is blocked by firewall policy, all images must be pulled from an internal registry (`example.corp.com`) instead.
 
 Without the flag, mm-repro generates:
 ```yaml
