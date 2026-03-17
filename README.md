@@ -244,22 +244,44 @@ Mix and match whatever the environment needs.
 
 ## Airgapped / Private Registry
 
-Running in a network without Docker Hub access? Pass `--image-registry` and mm-repro will prefix **every** generated image reference with your private registry URL:
+**What it does — one thing only:** prefixes every generated image reference with a registry URL you control. Everything else (config, topology, services, volumes, env vars) is completely unchanged.
 
+### Why it exists
+
+Consider a support engineer reproducing a customer issue. The customer runs Mattermost on a corporate Kubernetes cluster where Docker Hub is blocked by firewall policy — all images must be pulled from an internal Harbor registry (`harbor.corp.com`).
+
+Without the flag, mm-repro generates:
+```yaml
+image: postgres:15-alpine
+image: mattermost/mattermost-enterprise-edition:10.5.0
+```
+Docker tries to pull these from Docker Hub at `make run` time — which fails on a network without internet access.
+
+With `--image-registry harbor.corp.com`, mm-repro generates:
+```yaml
+image: harbor.corp.com/postgres:15-alpine
+image: harbor.corp.com/mattermost/mattermost-enterprise-edition:10.5.0
+```
+Docker pulls from the internal registry instead. That's the entire difference — the compose file, Makefile, env vars, nginx config, and all service configuration are identical in both cases.
+
+### Usage
+
+**CLI flag:**
 ```bash
 mm-repro init --support-package ./support-package.zip \
   --image-registry registry.internal:5000
 ```
 
-All generated `docker-compose.yml` / Kubernetes manifest image lines become `registry.internal:5000/<original-image>`. Nothing else changes.
-
-**Wizard mode** also asks about it:
+**Interactive wizard** — the last question in "Optional Services":
 ```
 Private / airgapped registry  (prefix all images with a custom registry URL)? [y/N]: y
 Registry URL (e.g. registry.internal:5000): registry.internal:5000
 ```
 
-**Pre-load images** (run on an internet-connected machine first):
+### Pre-load images onto your private registry
+
+Run this on an internet-connected machine first, then use the registry on the airgapped host:
+
 ```bash
 REGISTRY=registry.internal:5000
 
