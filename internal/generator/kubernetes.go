@@ -17,46 +17,48 @@ func (g *Generator) generateKubernetes() (string, error) {
 		return "", err
 	}
 
+	registry := p.Flags.ImageRegistry
+
 	// 01 — postgres
 	if p.Services.Database.Enabled {
 		if p.Services.Database.Type == "mysql" {
-			if _, err := g.writeFile("kubernetes/01-mysql.yaml", k8sMysqlManifest()); err != nil {
+			if _, err := g.writeFile("kubernetes/01-mysql.yaml", k8sMysqlManifest(registry)); err != nil {
 				return "", err
 			}
 		} else {
-			if _, err := g.writeFile("kubernetes/01-postgres.yaml", k8sPostgresManifest()); err != nil {
+			if _, err := g.writeFile("kubernetes/01-postgres.yaml", k8sPostgresManifest(registry)); err != nil {
 				return "", err
 			}
 		}
 	}
 
 	// 02 — mailhog
-	if _, err := g.writeFile("kubernetes/02-mailhog.yaml", k8sMailhogManifest()); err != nil {
+	if _, err := g.writeFile("kubernetes/02-mailhog.yaml", k8sMailhogManifest(registry)); err != nil {
 		return "", err
 	}
 
 	// 03 — optional services
 	seq := 3
 	if p.Services.Search.Enabled {
-		if _, err := g.writeFile(fmt.Sprintf("kubernetes/%02d-opensearch.yaml", seq), k8sOpensearchManifest()); err != nil {
+		if _, err := g.writeFile(fmt.Sprintf("kubernetes/%02d-opensearch.yaml", seq), k8sOpensearchManifest(registry)); err != nil {
 			return "", err
 		}
 		seq++
 	}
 	if p.Services.Auth.LDAPEnabled {
-		if _, err := g.writeFile(fmt.Sprintf("kubernetes/%02d-openldap.yaml", seq), k8sLDAPManifest()); err != nil {
+		if _, err := g.writeFile(fmt.Sprintf("kubernetes/%02d-openldap.yaml", seq), k8sLDAPManifest(registry)); err != nil {
 			return "", err
 		}
 		seq++
 	}
 	if p.Services.Auth.KeycloakEnabled {
-		if _, err := g.writeFile(fmt.Sprintf("kubernetes/%02d-keycloak.yaml", seq), k8sKeycloakManifest()); err != nil {
+		if _, err := g.writeFile(fmt.Sprintf("kubernetes/%02d-keycloak.yaml", seq), k8sKeycloakManifest(registry)); err != nil {
 			return "", err
 		}
 		seq++
 	}
 	if p.Services.FileStorage.UseMinIO {
-		if _, err := g.writeFile(fmt.Sprintf("kubernetes/%02d-minio.yaml", seq), k8sMinioManifest()); err != nil {
+		if _, err := g.writeFile(fmt.Sprintf("kubernetes/%02d-minio.yaml", seq), k8sMinioManifest(registry)); err != nil {
 			return "", err
 		}
 		seq++
@@ -89,8 +91,8 @@ func k8sNamespace() string {
 	return fmt.Sprintf(k8sNamespace_CONST, version.Short())
 }
 
-func k8sPostgresManifest() string {
-	return `apiVersion: v1
+func k8sPostgresManifest(registry string) string {
+	return fmt.Sprintf(`apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: postgres-pvc
@@ -120,7 +122,7 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: postgres:15-alpine
+        image: %s
         env:
         - name: POSTGRES_USER
           value: mmuser
@@ -154,11 +156,11 @@ spec:
   ports:
   - port: 5432
     targetPort: 5432
-`
+`, imageRef(registry, "postgres:15-alpine"))
 }
 
-func k8sMysqlManifest() string {
-	return `apiVersion: v1
+func k8sMysqlManifest(registry string) string {
+	return fmt.Sprintf(`apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: mysql-pvc
@@ -188,7 +190,7 @@ spec:
     spec:
       containers:
       - name: mysql
-        image: mysql:8.0
+        image: %s
         env:
         - name: MYSQL_ROOT_PASSWORD
           value: root_password_local_repro_only
@@ -219,11 +221,11 @@ spec:
   ports:
   - port: 3306
     targetPort: 3306
-`
+`, imageRef(registry, "mysql:8.0"))
 }
 
-func k8sMailhogManifest() string {
-	return `apiVersion: apps/v1
+func k8sMailhogManifest(registry string) string {
+	return fmt.Sprintf(`apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mailhog
@@ -242,7 +244,7 @@ spec:
     spec:
       containers:
       - name: mailhog
-        image: axllent/mailpit:latest
+        image: %s
         ports:
         - containerPort: 1025
           name: smtp
@@ -266,11 +268,11 @@ spec:
     port: 8025
     targetPort: 8025
     nodePort: 30025
-`
+`, imageRef(registry, "axllent/mailpit:latest"))
 }
 
-func k8sOpensearchManifest() string {
-	return `apiVersion: v1
+func k8sOpensearchManifest(registry string) string {
+	return fmt.Sprintf(`apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: opensearch-pvc
@@ -300,7 +302,7 @@ spec:
     spec:
       containers:
       - name: opensearch
-        image: opensearchproject/opensearch:2.11.0
+        image: %s
         env:
         - name: discovery.type
           value: single-node
@@ -331,11 +333,11 @@ spec:
   ports:
   - port: 9200
     targetPort: 9200
-`
+`, imageRef(registry, "opensearchproject/opensearch:2.11.0"))
 }
 
-func k8sLDAPManifest() string {
-	return `apiVersion: v1
+func k8sLDAPManifest(registry string) string {
+	return fmt.Sprintf(`apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: ldap-data-pvc
@@ -365,7 +367,7 @@ spec:
     spec:
       containers:
       - name: openldap
-        image: osixia/openldap:1.5.0
+        image: %s
         args: ["--copy-service"]
         env:
         - name: LDAP_ORGANISATION
@@ -401,11 +403,11 @@ spec:
   ports:
   - port: 389
     targetPort: 389
-`
+`, imageRef(registry, "osixia/openldap:1.5.0"))
 }
 
-func k8sKeycloakManifest() string {
-	return `apiVersion: v1
+func k8sKeycloakManifest(registry string) string {
+	return fmt.Sprintf(`apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: keycloak-pvc
@@ -435,7 +437,7 @@ spec:
     spec:
       containers:
       - name: keycloak
-        image: quay.io/keycloak/keycloak:23.0
+        image: %s
         args: ["start-dev", "--import-realm"]
         env:
         - name: KEYCLOAK_ADMIN
@@ -469,11 +471,11 @@ spec:
   - port: 8080
     targetPort: 8080
     nodePort: 30080
-`
+`, imageRef(registry, "quay.io/keycloak/keycloak:23.0"))
 }
 
-func k8sMinioManifest() string {
-	return `apiVersion: v1
+func k8sMinioManifest(registry string) string {
+	return fmt.Sprintf(`apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: minio-pvc
@@ -503,7 +505,7 @@ spec:
     spec:
       containers:
       - name: minio
-        image: minio/minio:latest
+        image: %s
         args: ["server", "/data", "--console-address", ":9001"]
         env:
         - name: MINIO_ROOT_USER
@@ -540,7 +542,7 @@ spec:
     port: 9001
     targetPort: 9001
     nodePort: 30901
-`
+`, imageRef(registry, "minio/minio:latest"))
 }
 
 func k8sMattermostManifest(p *models.ReproPlan) string {
@@ -567,7 +569,7 @@ func k8sMattermostManifest(p *models.ReproPlan) string {
 }
 
 func k8sMattermostConfigMap(p *models.ReproPlan) string {
-	image := fmt.Sprintf("%s:%s", p.MattermostImage, p.Services.Mattermost.Tag)
+	image := imageRef(p.Flags.ImageRegistry, fmt.Sprintf("%s:%s", p.MattermostImage, p.Services.Mattermost.Tag))
 	dbDriver := "postgres"
 	dbSource := "postgres://mmuser:mmuser_password_local_repro_only@postgres:5432/mattermost?sslmode=disable"
 	if p.Services.Database.Type == "mysql" {
@@ -635,7 +637,7 @@ data:
 }
 
 func k8sMattermostDeployment(p *models.ReproPlan) string {
-	image := fmt.Sprintf("%s:%s", p.MattermostImage, p.Services.Mattermost.Tag)
+	image := imageRef(p.Flags.ImageRegistry, fmt.Sprintf("%s:%s", p.MattermostImage, p.Services.Mattermost.Tag))
 	return fmt.Sprintf(`apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -665,7 +667,7 @@ spec:
 }
 
 func k8sMattermostStatefulSet(p *models.ReproPlan) string {
-	image := fmt.Sprintf("%s:%s", p.MattermostImage, p.Services.Mattermost.Tag)
+	image := imageRef(p.Flags.ImageRegistry, fmt.Sprintf("%s:%s", p.MattermostImage, p.Services.Mattermost.Tag))
 	return fmt.Sprintf(`apiVersion: apps/v1
 kind: StatefulSet
 metadata:

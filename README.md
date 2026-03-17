@@ -235,9 +235,57 @@ mm-repro init --support-package ./support-package.zip \
   --with-grafana       # Prometheus + Grafana (metrics)
   --with-ngrok         # public HTTPS tunnel (test from your phone!)
   --with-kubernetes    # generate kind manifests instead of Compose
+  --image-registry registry.internal:5000   # airgapped/private registry (see below)
 ```
 
 Mix and match whatever the environment needs.
+
+---
+
+## Airgapped / Private Registry
+
+Running in a network without Docker Hub access? Pass `--image-registry` and mm-repro will prefix **every** generated image reference with your private registry URL:
+
+```bash
+mm-repro init --support-package ./support-package.zip \
+  --image-registry registry.internal:5000
+```
+
+All generated `docker-compose.yml` / Kubernetes manifest image lines become `registry.internal:5000/<original-image>`. Nothing else changes.
+
+**Wizard mode** also asks about it:
+```
+Private / airgapped registry  (prefix all images with a custom registry URL)? [y/N]: y
+Registry URL (e.g. registry.internal:5000): registry.internal:5000
+```
+
+**Pre-load images** (run on an internet-connected machine first):
+```bash
+REGISTRY=registry.internal:5000
+
+for IMAGE in \
+  mattermost/mattermost-enterprise-edition:10.5.0 \
+  postgres:15-alpine \
+  mysql:8.0 \
+  opensearchproject/opensearch:2.11.0 \
+  "docker.elastic.co/elasticsearch/elasticsearch:8.11.0" \
+  osixia/openldap:1.5.0 \
+  osixia/phpldapadmin:0.9.0 \
+  "quay.io/keycloak/keycloak:23.0" \
+  minio/minio:latest \
+  axllent/mailpit:latest \
+  nginx:alpine \
+  mattermost/rtcd:latest \
+  prom/prometheus:latest \
+  grafana/grafana:latest \
+  ngrok/ngrok:latest; do
+    docker pull "$IMAGE"
+    docker tag "$IMAGE" "$REGISTRY/$IMAGE"
+    docker push "$REGISTRY/$IMAGE"
+done
+```
+
+> **No flag = no change.** Omitting `--image-registry` keeps all original image references — zero impact on existing workflows.
 
 ---
 

@@ -167,6 +167,10 @@ func (w *wizard) Run() (*models.SupportPackage, models.ReproFlags, error) {
 		}
 	}
 
+	if w.yn("Private / airgapped registry  (prefix all images with a custom registry URL)", false) {
+		flags.ImageRegistry = w.ask("Registry URL (e.g. registry.internal:5000)", "")
+	}
+
 	// ── Confirmation ─────────────────────────────────────────────────────────
 
 	w.sectionHeader("Summary")
@@ -304,6 +308,9 @@ func (w *wizard) printSummary(sp *models.SupportPackage, flags models.ReproFlags
 		fmt.Printf("  %s Extras:      %snone (bare minimum)%s\n", tick, dim, reset)
 	}
 	fmt.Printf("  %s Mailpit:     always included — captures all outgoing emails\n", tick)
+	if flags.ImageRegistry != "" {
+		fmt.Printf("  %s Registry:   %s  (airgapped mode — all images prefixed)\n", tick, flags.ImageRegistry)
+	}
 }
 
 // ─── version parsing ──────────────────────────────────────────────────────────

@@ -37,6 +37,7 @@ var (
 	initForceDockerCompose bool
 	initWithNgrok          bool
 	initLicenseFile        string
+	initImageRegistry      string
 )
 
 var initCmd = &cobra.Command{
@@ -75,6 +76,7 @@ func init() {
 	initCmd.Flags().BoolVar(&initForceDockerCompose, "force-docker-compose", false, "Force Docker Compose output even when a Kubernetes deployment is detected")
 	initCmd.Flags().BoolVar(&initWithNgrok, "with-ngrok", false, "Include ngrok tunnel for mobile/remote access (Docker Compose only)")
 	initCmd.Flags().StringVar(&initLicenseFile, "license", "", "Path to a Mattermost license file — pre-loads it so Enterprise features (LDAP sync, SAML) are active from first boot")
+	initCmd.Flags().StringVar(&initImageRegistry, "image-registry", "", "Prefix all image refs with this registry URL (for airgapped/private environments, e.g. registry.internal:5000)")
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
@@ -118,6 +120,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		if !cmd.Flags().Changed("with-ngrok") {
 			initWithNgrok = wizardFlags.WithNgrok
+		}
+		if !cmd.Flags().Changed("image-registry") {
+			initImageRegistry = wizardFlags.ImageRegistry
 		}
 		fmt.Println()
 
@@ -214,6 +219,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		ForceDockerCompose: initForceDockerCompose,
 		WithNgrok:          initWithNgrok,
 		LicenseFile:        initLicenseFile,
+		ImageRegistry:      initImageRegistry,
 	}
 	engine := inference.NewEngine(flags)
 	plan := engine.Infer(sp, outputDir)

@@ -264,6 +264,13 @@ func (g *Generator) generateReproSummary() (string, error) {
 		sb.WriteString("\n")
 	}
 
+	if p.Flags.ImageRegistry != "" {
+		sb.WriteString("## Image Registry\n\n")
+		sb.WriteString(fmt.Sprintf("All images are prefixed with: `%s`\n\n", p.Flags.ImageRegistry))
+		sb.WriteString("This environment is configured for **airgapped / private registry** use.\n")
+		sb.WriteString("Ensure all required images have been mirrored to this registry before running `make run`.\n\n")
+	}
+
 	sb.WriteString("## Security Notes\n\n")
 	sb.WriteString("- All credentials in .env are LOCAL REPRO ONLY — not from the customer environment\n")
 	sb.WriteString("- See REDACTION_REPORT.md for what was redacted from the support package\n")

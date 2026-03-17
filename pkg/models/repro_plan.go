@@ -191,4 +191,7 @@ type ReproFlags struct {
 	// LicenseFile is the path to a .mattermost-license file provided at init time.
 	// When set, the generator pre-loads it so Enterprise features are active from boot.
 	LicenseFile string `json:"license_file,omitempty"`
+	// ImageRegistry is an optional private/airgapped registry prefix applied to all
+	// generated image references (e.g. "registry.internal:5000"). Empty = Docker Hub.
+	ImageRegistry string `json:"image_registry,omitempty"`
 }
