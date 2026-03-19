@@ -318,8 +318,8 @@ Every service mm-repro can spin up, what it does, and how to reach it:
 | Service | What it does | URL | Credentials |
 |---------|-------------|-----|-------------|
 | **Mattermost** | The collaboration platform itself — what you're testing | http://localhost:8065 | `sysadmin` / `Sysadmin1!` |
-| **PostgreSQL** | Relational database that stores all Mattermost data (channels, messages, users) | internal | auto-generated |
-| **MySQL** | Alternative to PostgreSQL — used when detected in the package or forced with `--db mysql` | internal | auto-generated |
+| **PostgreSQL** | Relational database that stores all Mattermost data (channels, messages, users) | `localhost:5432` (host port) | user: `mmuser` / pass: `mmuser_password_local_repro_only` / db: `mattermost` |
+| **MySQL** | Alternative to PostgreSQL — used when detected in the package or forced with `--db mysql` | `localhost:3306` (host port) | user: `mmuser` / pass: `mmuser_password_local_repro_only` / db: `mattermost` · root pass: `root_password_local_repro_only` |
 | **Mailpit** | Catches every outgoing email so nothing reaches real inboxes — view captured emails in its web UI | http://localhost:8025 | No login |
 | **nginx** | Load balancer in front of all Mattermost nodes in HA mode — distributes traffic evenly across the cluster | http://localhost:8065 | routes to all nodes |
 | **MinIO** | Local S3-compatible object storage — Mattermost stores file attachments here instead of on disk; required for HA so all nodes share one storage backend | http://localhost:9001 | `repro_minio_user` / `minio_password_local_repro_only` |
@@ -334,6 +334,18 @@ Every service mm-repro can spin up, what it does, and how to reach it:
 | **ngrok** | Creates a public HTTPS tunnel so you can open Mattermost on a phone or share it remotely | http://localhost:4040 (inspector) | No login |
 
 > Services listed as **internal** are not exposed on a host port — Mattermost connects to them over Docker's internal network.
+
+**Connect to the database directly** (any SQL client, TablePlus, DBeaver, psql, mysql CLI):
+
+```bash
+# PostgreSQL
+psql "postgres://mmuser:mmuser_password_local_repro_only@localhost:5432/mattermost"
+
+# MySQL
+mysql -h 127.0.0.1 -P 3306 -u mmuser -pmmuser_password_local_repro_only mattermost
+# or as root (MySQL only):
+mysql -h 127.0.0.1 -P 3306 -u root -proot_password_local_repro_only mattermost
+```
 
 ---
 
